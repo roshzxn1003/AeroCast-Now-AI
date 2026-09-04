@@ -103,17 +103,30 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Launch the Streamlit Pro Dashboard
+### 2. Launch FastAPI REST Server & Mobile-First React App
+
+**Backend REST Server:**
+```bash
+uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Mobile-First React Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. Launch the Streamlit Pro Dashboard (Legacy / Alternative UI)
 ```bash
 python -m streamlit run app.py
 ```
 
-### 3. Run the Automated Test Suite
+### 4. Run the Automated Test Suite
 ```bash
 python test_nowcasting.py
 ```
 
-### 4. Retrain the ConvLSTM Neural Model (Optional)
+### 5. Retrain the ConvLSTM Neural Model (Optional)
 ```bash
 python train_nowcasting_model.py
 ```
@@ -124,17 +137,28 @@ python train_nowcasting_model.py
 
 ```
 SIH/
-├── app.py                     # Main Nowcasting Streamlit Intelligence Dashboard (UI & CAP Exporter)
+├── api_server.py              # FastAPI High-Performance REST API Layer (CORS, Swagger, REST endpoints)
+├── app.py                     # Streamlit Intelligence Dashboard (UI & CAP Exporter)
 ├── nowcasting_engine.py       # Spatio-Temporal ConvLSTM Inference, SCIT Tracker & Lightning Jump Core
 ├── observation_service.py     # Multi-Modal Ingestion (Radar DWR, Satellite INSAT-3D, Lightning LDN, NWP)
 ├── train_nowcasting_model.py  # ConvLSTM Training Pipeline with Weighted Convective Loss
 ├── test_nowcasting.py         # Automated Test Suite (7/7 Passing)
-├── requirements.txt           # Python dependency manifest
+├── requirements.txt           # Python dependency manifest (FastAPI, Uvicorn, TensorFlow, etc.)
 ├── Dockerfile                 # Container deployment recipe
 ├── README.md                  # Comprehensive Documentation & Architecture Guide
 ├── REPORT.txt                 # Executive milestone summary
+├── frontend/                  # Mobile-First Meteorological React Application
+│   ├── src/
+│   │   ├── components/        # Header, BottomNav, MetricCards, LightningJumpBanner, TimeScrubber, RadarViewport
+│   │   ├── pages/             # NowcastScreen, AlertsScreen, StormsScreen, RiskScreen, MoreScreen
+│   │   ├── services/          # REST API Client with robust offline simulated fallback
+│   │   ├── store/             # Zustand global reactive state & animation loop
+│   │   └── types/             # Meteorological data types and interfaces
+│   ├── package.json           # React 19, TypeScript, Tailwind v4, Lucide, Recharts
+│   └── vite.config.ts         # Vite build configuration with API reverse proxy
 └── models/
     ├── convlstm_nowcaster.keras # Trained Spatio-Temporal ConvLSTM Model Checkpoint
     ├── model_metadata.json      # Model metrics and architecture metadata
     └── training_performance.png # Convergence loss plot
 ```
+

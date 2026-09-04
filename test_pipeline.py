@@ -10,9 +10,7 @@ from weather_service import (
     fetch_open_meteo_sequence,
     generate_mock_sequence,
     geocode_city,
-    fetch_multi_station_sequences
-)
-from app import (
+    fetch_multi_station_sequences,
     load_trained_pipeline,
     predict_horizon,
     analyze_extreme_weather,

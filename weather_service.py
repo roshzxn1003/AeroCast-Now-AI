@@ -258,3 +258,105 @@ def fetch_multi_station_sequences(cities: List[str], use_live: bool = True) -> D
         results = dict(executor.map(lambda c: _fetch_single(c), cities))
     return results
 
+
+def load_trained_pipeline():
+    """Loads synoptic LSTM model, scaler, and metadata."""
+    import os
+    import json
+    import joblib
+    import tensorflow as tf
+
+    model_path = "models/weather_lstm.keras"
+    scaler_path = "models/scaler.pkl"
+    meta_path = "models/scaler_params.json"
+
+    model = None
+    if os.path.exists(model_path):
+        try:
+            model = tf.keras.models.load_model(model_path)
+        except Exception:
+            pass
+
+    scaler = None
+    if os.path.exists(scaler_path):
+        try:
+            scaler = joblib.load(scaler_path)
+        except Exception:
+            pass
+
+    meta = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+        except Exception:
+            pass
+
+    return model, scaler, meta
+
+
+def predict_horizon(model, scaler, sequence: np.ndarray, steps: int = 3) -> List[float]:
+    """Generates multi-day recursive autoregressive temperature predictions."""
+    if model is None or scaler is None:
+        return [float(sequence[-1, 0] + i * 0.5) for i in range(1, steps + 1)]
+
+    current_seq = sequence.copy()
+    preds = []
+
+    for _ in range(steps):
+        scaled_seq = scaler.transform(current_seq[-7:])
+        input_tensor = np.expand_dims(scaled_seq, axis=0)
+        norm_pred = model.predict(input_tensor, verbose=0)[0, 0]
+
+        # Inverse transform temperature (first feature)
+        dummy = np.zeros((1, 5))
+        dummy[0, 0] = norm_pred
+        unscaled_temp = float(scaler.inverse_transform(dummy)[0, 0])
+        preds.append(round(unscaled_temp, 1))
+
+        # Append step to rollout
+        next_row = current_seq[-1].copy()
+        next_row[0] = unscaled_temp
+        current_seq = np.vstack([current_seq, next_row])
+
+    return preds
+
+
+def analyze_extreme_weather(sequence: np.ndarray, pred_temp: float) -> List[Dict[str, Any]]:
+    """Analyzes meteorological thresholds for Cyclonic Depression, Heatwave, Squall alerts."""
+    alerts = []
+    pressure_trend = float(sequence[-1, 3] - sequence[0, 3])
+    max_wind = float(np.max(sequence[:, 2]))
+    current_temp = float(sequence[-1, 0])
+
+    if pressure_trend <= -5.0 and max_wind >= 12.0:
+        alerts.append({
+            "title": "Severe Cyclone & Deep Depression Alert",
+            "severity": "CRITICAL",
+            "message": f"Barometric pressure dropped by {abs(pressure_trend):.1f} hPa with peak gusts reaching {max_wind:.1f} m/s.",
+        })
+    elif pressure_trend <= -3.0 or max_wind >= 10.0:
+        alerts.append({
+            "title": "Tropical Low Pressure & Squall Watch",
+            "severity": "WARNING",
+            "message": f"Falling barometric pressure ({pressure_trend:.1f} hPa) indicating convective depression.",
+        })
+
+    if pred_temp >= 40.0 or current_temp >= 40.0:
+        alerts.append({
+            "title": "Severe Heatwave & High Thermal Stress",
+            "severity": "WARNING",
+            "message": f"Projected surface temperature exceeding {max(pred_temp, current_temp):.1f} °C.",
+        })
+
+    return alerts
+
+
+def format_temp(temp_celsius: float, unit: str = "Celsius (°C)") -> str:
+    """Formats temperature in selected unit."""
+    if "Fahrenheit" in unit:
+        val = (temp_celsius * 9.0 / 5.0) + 32.0
+        return f"{val:.1f} °F"
+    return f"{temp_celsius:.1f} °C"
+
+
