@@ -1,0 +1,23 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Large Datasets or Local Scratch
+.agents/
+.claude/
+scratch/

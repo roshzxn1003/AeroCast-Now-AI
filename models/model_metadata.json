@@ -1,0 +1,52 @@
+{
+    "model_architecture": "Spatio-Temporal ConvLSTM2D (32-32-16-Conv3D)",
+    "input_shape": [
+        4,
+        32,
+        32,
+        4
+    ],
+    "output_shape": [
+        4,
+        32,
+        32,
+        4
+    ],
+    "channels": [
+        "Radar Reflectivity (dBZ)",
+        "Vertically Integrated Liquid (kg/m\u00b2)",
+        "INSAT-3D TIR Brightness Temp (\u00b0C)",
+        "Lightning Flash Density (flashes/km\u00b2)"
+    ],
+    "forecast_lead_times_minutes": [
+        15,
+        30,
+        45,
+        60,
+        90,
+        120
+    ],
+    "metrics_threshold_25dBZ": {
+        "CSI_Threat_Score": 0.0,
+        "Probability_of_Detection_POD": 0.0,
+        "False_Alarm_Ratio_FAR": 0.0,
+        "Heidke_Skill_Score_HSS": 0.0
+    },
+    "metrics_threshold_35dBZ": {
+        "CSI_Threat_Score": 0.0,
+        "Probability_of_Detection_POD": 0.0,
+        "False_Alarm_Ratio_FAR": 0.0,
+        "Heidke_Skill_Score_HSS": 0.0
+    },
+    "metrics_threshold_45dBZ": {
+        "CSI_Threat_Score": 0.0,
+        "Probability_of_Detection_POD": 0.0,
+        "False_Alarm_Ratio_FAR": 0.0,
+        "Heidke_Skill_Score_HSS": 0.0
+    },
+    "reflectivity_mae_dbz": 8.97,
+    "reflectivity_rmse_dbz": 20.7,
+    "training_epochs": 15,
+    "training_samples": 112,
+    "validation_samples": 28
+}
