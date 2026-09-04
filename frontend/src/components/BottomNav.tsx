@@ -48,7 +48,7 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d1117]/95 backdrop-blur-lg border-t border-white/10 bottom-nav">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d1117]/95 backdrop-blur-lg border-t border-white/10 bottom-nav lg:hidden">
       <div className="max-w-md mx-auto grid grid-cols-5 px-1 py-1">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;

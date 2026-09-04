@@ -76,8 +76,8 @@ export const MetricCards: React.FC = () => {
   ];
 
   return (
-    <div className="overflow-x-auto pb-1 -mx-3 px-3 scrollbar-none">
-      <div className="flex gap-2 min-w-max">
+    <div className="overflow-x-auto pb-1 -mx-3 px-3 lg:mx-0 lg:px-0 lg:overflow-visible scrollbar-none">
+      <div className="flex gap-2 min-w-max lg:min-w-0 lg:grid lg:grid-cols-5 lg:gap-3">
         {cards.map((c, i) => {
           const Icon = c.icon;
           return (

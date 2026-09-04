@@ -213,8 +213,8 @@ export const RadarViewport: React.FC = () => {
       <div className="relative aspect-square w-full rounded-2xl overflow-hidden border border-white/15 shadow-2xl bg-[#0a0e14]">
         <canvas
           ref={canvasRef}
-          width={400}
-          height={400}
+          width={540}
+          height={540}
           className="w-full h-full object-cover"
         />
 

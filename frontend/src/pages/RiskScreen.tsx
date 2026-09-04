@@ -105,20 +105,20 @@ export const RiskScreen: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3 p-3 max-w-lg mx-auto pb-24 animate-in fade-in duration-300">
+    <div className="w-full max-w-7xl mx-auto px-3 py-3 lg:px-6 lg:py-4 space-y-4 pb-24 lg:pb-12 animate-in fade-in duration-300">
       {/* Header */}
       <div>
-        <h2 className="text-base font-extrabold text-slate-100 flex items-center gap-1.5">
+        <h2 className="text-base lg:text-lg font-extrabold text-slate-100 flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 text-red-400" />
           Multi-Sector Impact & Disaster Advisories
         </h2>
-        <p className="text-[11px] text-slate-400">
-          Tailored Vulnerability Assessments for Critical Infrastructure & Public Safety
+        <p className="text-xs text-slate-400">
+          Tailored Convective Vulnerability Assessments for Critical Infrastructure & Public Safety
         </p>
       </div>
 
-      {/* 4 Sector Cards */}
-      <div className="space-y-2.5">
+      {/* 4 Sector Cards (2x2 grid on desktop) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {sectors.map((sec) => {
           const Icon = sec.icon;
           const isExpanded = expandedSector === sec.id;
@@ -126,22 +126,22 @@ export const RiskScreen: React.FC = () => {
           return (
             <div
               key={sec.id}
-              className="bg-[#161b22] border border-white/10 rounded-xl overflow-hidden transition-all"
+              className="bg-[#161b22] border border-white/10 rounded-xl overflow-hidden transition-all shadow-lg flex flex-col justify-between"
             >
               <button
                 onClick={() => setExpandedSector(isExpanded ? null : sec.id)}
-                className="w-full p-3 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
+                className="w-full p-3.5 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-white/5 text-slate-200">
-                    <Icon className="w-4 h-4" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-white/5 text-slate-200 shrink-0">
+                    <Icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-extrabold text-xs text-slate-100">
+                    <div className="font-extrabold text-xs lg:text-sm text-slate-100">
                       {sec.title}
                     </div>
                     <span
-                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border mt-0.5 inline-block ${sec.statusColor}`}
+                      className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border mt-1 inline-block ${sec.statusColor}`}
                     >
                       {sec.status}
                     </span>
@@ -155,24 +155,27 @@ export const RiskScreen: React.FC = () => {
                 )}
               </button>
 
+              {/* Collapsible / Expanded details */}
               {isExpanded && (
-                <div className="px-3 pb-3 pt-1 border-t border-white/5 space-y-2.5 animate-in fade-in duration-200">
-                  <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                <div className="px-3.5 pb-3.5 pt-1 border-t border-white/5 space-y-3 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
                     {sec.metrics.map((m, i) => (
-                      <div key={i} className="bg-black/30 p-1.5 rounded-lg border border-white/5">
-                        <div className="text-slate-400 leading-tight">{m.label}</div>
-                        <div className="font-extrabold text-slate-200 mt-0.5">
+                      <div key={i} className="bg-black/30 p-2 rounded-lg border border-white/5">
+                        <div className="text-[10px] text-slate-400 leading-tight">{m.label}</div>
+                        <div className="font-extrabold text-slate-200 mt-1">
                           {m.val}
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="bg-white/5 p-2 rounded-lg border border-white/5 text-[11px] text-slate-300">
+                  <div className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-xs text-slate-300">
                     <div className="font-bold text-amber-300 text-[10px] uppercase mb-0.5">
                       Operational Protocol
                     </div>
-                    <p className="leading-snug text-slate-300">{sec.action}</p>
+                    <p className="leading-relaxed text-slate-300 text-[11px] lg:text-xs">
+                      {sec.action}
+                    </p>
                   </div>
                 </div>
               )}
@@ -182,41 +185,46 @@ export const RiskScreen: React.FC = () => {
       </div>
 
       {/* CAP Export & Sharing */}
-      <div className="bg-[#161b22] border border-white/10 rounded-xl p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <AlertOctagon className="w-4 h-4 text-red-400" />
-            <h3 className="font-bold text-xs text-slate-200">
-              NDMA / IMD CAP v1.2 Standard Alert Payload
-            </h3>
+      <div className="bg-[#161b22] border border-white/10 rounded-xl p-4 space-y-3 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertOctagon className="w-5 h-5 text-red-400" />
+            <div>
+              <h3 className="font-bold text-xs lg:text-sm text-slate-200">
+                NDMA / IMD CAP v1.2 Standard Alert Payload
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Conforming to OASIS Common Alerting Protocol v1.2 standards
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleCopyCap}
-              className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[10px] flex items-center gap-1 px-2 font-medium"
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs flex items-center gap-1.5 px-3 font-medium transition-colors"
             >
-              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
             <button
               onClick={handleDownloadCap}
-              className="p-1 rounded bg-sky-500 hover:bg-sky-400 text-white text-[10px] flex items-center gap-1 px-2 font-bold"
+              className="p-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-xs flex items-center gap-1.5 px-3 font-bold shadow transition-colors"
             >
-              <Download className="w-3 h-3" />
-              Download JSON
+              <Download className="w-3.5 h-3.5" />
+              <span>Download JSON</span>
             </button>
           </div>
         </div>
 
-        <p className="text-[11px] text-slate-400">
-          This payload conforms to OASIS Common Alerting Protocol v1.2 standards for integration with national emergency broadcast systems.
-        </p>
-
-        <div className="bg-black/40 rounded-lg p-2 font-mono text-[10px] text-slate-300 space-y-1">
+        <div className="bg-black/40 rounded-xl p-3 font-mono text-xs text-slate-300 space-y-1.5 border border-white/5">
           <div><span className="text-slate-500">ID:</span> {cap.identifier}</div>
           <div><span className="text-slate-500">Sender:</span> {cap.sender}</div>
           <div><span className="text-slate-500">Event:</span> {cap.info.event}</div>
-          <div><span className="text-slate-500">Severity:</span> {cap.info.severity} • <span className="text-slate-500">Urgency:</span> {cap.info.urgency}</div>
+          <div>
+            <span className="text-slate-500">Severity:</span> {cap.info.severity} •{' '}
+            <span className="text-slate-500">Urgency:</span> {cap.info.urgency} •{' '}
+            <span className="text-slate-500">Certainty:</span> {cap.info.certainty}
+          </div>
           <div><span className="text-slate-500">Area:</span> {cap.info.area.areaDesc}</div>
         </div>
       </div>
