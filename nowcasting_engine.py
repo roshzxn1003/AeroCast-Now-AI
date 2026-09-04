@@ -13,25 +13,34 @@ from scipy.ndimage import label, center_of_mass
 
 def weighted_convective_loss(y_true, y_pred):
     """
-    Weighted meteorological loss prioritizing intense convective storm cores (dBZ >= 35).
-    Prevents standard MSE from blurring convective cells into zero-dominated background.
+    Weighted Balanced Meteorological Convective Loss (BMAE).
+    Prioritizes active convective cores (dBZ >= 35, VIL >= 25, Flash >= 10).
+    Applies non-linear weighting:
+      - Background clear-air (y < 0.25, < 18 dBZ): weight 1.0
+      - Light/Moderate precipitation (0.25 <= y < 0.40): weight 5.0
+      - Severe storm cores & high flash rate (y >= 0.40, >= 30 dBZ): weight 13.0
     """
-    error = tf.square(y_true - y_pred)
-    # Give 5x higher weight to active convective pixels (y_true > 0.25, approx > 20 dBZ)
-    weight = 1.0 + 4.0 * tf.cast(y_true > 0.25, tf.float32)
+    error = tf.abs(y_true - y_pred)
+    weight = 1.0 + 4.0 * tf.cast(y_true >= 0.25, tf.float32) + 8.0 * tf.cast(y_true >= 0.40, tf.float32)
     return tf.reduce_mean(weight * error)
 
 def build_convlstm_model(input_shape=(4, 32, 32, 4), output_steps=4) -> tf.keras.Model:
     """
-    Builds a Spatio-Temporal Convolutional LSTM Network for Radar Reflectivity,
-    VIL, Satellite TIR, and Lightning Flash Density extrapolation.
-    Input:  (Batch, T_in=4, H=32, W=32, C=4)
-    Output: (Batch, T_out=4, H=32, W=32, C=4)
+    Builds a Spatio-Temporal Residual-Attention Convolutional LSTM Network (ResAtt-ConvLSTM2D)
+    for multi-modal Radar Reflectivity, VIL, Satellite TIR, and Lightning Flash Density nowcasting.
+    
+    Architecture:
+    - 3D Spatio-Temporal Encoder (ConvLSTM2D 32 filters)
+    - Deep Latent Feature Extractor (ConvLSTM2D 32 filters)
+    - Convective Residual Skip Connection (Add Encoder + Deep Latent features)
+    - Spatio-Temporal Decoder (ConvLSTM2D 32 filters)
+    - Multi-Channel Spatial Residual Attention Gate (Sigmoid SE Attention + Skip)
+    - 3D Convolution Output Projection with Sigmoid activation [0, 1]
     """
     inputs = tf.keras.layers.Input(shape=input_shape)
     
-    # Layer 1: ConvLSTM Encoder
-    x = tf.keras.layers.ConvLSTM2D(
+    # Layer 1: Spatio-Temporal Encoder
+    x1 = tf.keras.layers.ConvLSTM2D(
         filters=32,
         kernel_size=(3, 3),
         padding='same',
@@ -39,9 +48,8 @@ def build_convlstm_model(input_shape=(4, 32, 32, 4), output_steps=4) -> tf.keras
         activation='tanh',
         recurrent_activation='sigmoid'
     )(inputs)
-    x = tf.keras.layers.BatchNormalization()(x)
     
-    # Layer 2: Deep Spatio-Temporal Feature Extractor
+    # Layer 2: Deep Convective Feature Extractor
     x2 = tf.keras.layers.ConvLSTM2D(
         filters=32,
         kernel_size=(3, 3),
@@ -49,30 +57,44 @@ def build_convlstm_model(input_shape=(4, 32, 32, 4), output_steps=4) -> tf.keras
         return_sequences=True,
         activation='tanh',
         recurrent_activation='sigmoid'
-    )(x)
-    x2 = tf.keras.layers.BatchNormalization()(x2)
+    )(x1)
     
-    # Layer 3: ConvLSTM Decoder
+    # Convective Residual Skip Connection (Preserves sharp convective cores)
+    res = tf.keras.layers.add([x1, x2])
+    
+    # Layer 3: Convective Decoder
     x3 = tf.keras.layers.ConvLSTM2D(
-        filters=16,
+        filters=32,
         kernel_size=(3, 3),
         padding='same',
         return_sequences=True,
         activation='tanh',
         recurrent_activation='sigmoid'
-    )(x2)
-    x3 = tf.keras.layers.BatchNormalization()(x3)
+    )(res)
     
-    # Layer 4: 3D Convolution output projection with ReLU activation [0, inf)
+    # Layer 4: Multi-Channel Convective Residual Attention Gate
+    att = tf.keras.layers.Conv3D(
+        filters=32,
+        kernel_size=(1, 1, 1),
+        padding='same',
+        activation='sigmoid'
+    )(x3)
+    x_att = tf.keras.layers.add([x3, tf.keras.layers.multiply([x3, att])])
+    
+    # Layer 5: Output Projection with Sigmoid activation [0, 1]
     outputs = tf.keras.layers.Conv3D(
         filters=4,
         kernel_size=(1, 3, 3),
         padding='same',
-        activation='relu'
-    )(x3)
+        activation='sigmoid'
+    )(x_att)
     
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="SpatioTemporal_ConvLSTM_Nowcaster")
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.002), loss=weighted_convective_loss, metrics=['mae'])
+    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="ResAtt_ConvLSTM_Nowcaster")
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0035, clipnorm=1.0),
+        loss=weighted_convective_loss,
+        metrics=['mae']
+    )
     return model
 
 def load_nowcasting_model() -> Tuple[tf.keras.Model, Dict[str, Any]]:
@@ -82,7 +104,10 @@ def load_nowcasting_model() -> Tuple[tf.keras.Model, Dict[str, Any]]:
     
     if os.path.exists(model_path):
         try:
-            model = tf.keras.models.load_model(model_path)
+            model = tf.keras.models.load_model(
+                model_path,
+                custom_objects={"weighted_convective_loss": weighted_convective_loss}
+            )
         except Exception:
             model = build_convlstm_model()
     else:

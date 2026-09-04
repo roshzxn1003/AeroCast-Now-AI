@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNowcastStore, TIME_STEPS } from '../store/nowcastStore';
-import { Play, Pause, SkipBack, SkipForward, Clock } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Clock, Repeat } from 'lucide-react';
 
 export const TimeScrubber: React.FC = () => {
   const { timeIndex, setTimeIndex, isPlaying, togglePlayback } = useNowcastStore();
@@ -10,82 +10,97 @@ export const TimeScrubber: React.FC = () => {
     if (!isPlaying) return;
     const interval = setInterval(() => {
       setTimeIndex((timeIndex + 1) % TIME_STEPS.length);
-    }, 1400);
+    }, 1300);
     return () => clearInterval(interval);
   }, [isPlaying, timeIndex, setTimeIndex]);
 
   const currentStep = TIME_STEPS[timeIndex];
 
   return (
-    <div className="bg-[#161b22]/90 border border-white/10 rounded-xl p-3 space-y-2 backdrop-blur-md">
-      {/* Top Header: Step Label & Playback Controls */}
-      <div className="flex items-center justify-between">
+    <div className="bg-[#161b22]/95 border border-white/10 rounded-2xl p-3 lg:p-4 space-y-3 backdrop-blur-md shadow-xl">
+      {/* Top Header: Step Status & Transport Controls */}
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div
-            className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold font-mono ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono flex items-center gap-1.5 shadow-sm ${
               currentStep.isForecast
-                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
+                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
             }`}
           >
-            {currentStep.isForecast ? '⚡ AI NOWCAST' : '📡 OBSERVED'}
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                currentStep.isForecast ? 'bg-sky-400 animate-pulse' : 'bg-emerald-400'
+              }`}
+            />
+            <span>{currentStep.isForecast ? 'CONVLSTM ROLLOUT' : 'OBSERVED DWR'}</span>
           </div>
-          <span className="text-xs font-bold text-slate-200">
-            {currentStep.label}
-          </span>
+
+          <div className="flex flex-col">
+            <span className="text-xs lg:text-sm font-bold text-slate-100">
+              {currentStep.label}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {currentStep.isForecast
+                ? `Forecast Horizon: +${currentStep.leadTimeMin} min`
+                : currentStep.leadTimeMin === 0
+                ? 'Current Verification Baseline (t=0)'
+                : `Historical Archive: ${currentStep.leadTimeMin} min`}
+            </span>
+          </div>
         </div>
 
         {/* Transport buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10">
           <button
             onClick={() => setTimeIndex(Math.max(0, timeIndex - 1))}
             disabled={timeIndex === 0}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 text-slate-300 transition-colors"
-            title="Step Back"
+            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-25 text-slate-300 transition-colors"
+            title="Step Back 15 Min"
           >
             <SkipBack className="w-3.5 h-3.5" />
           </button>
 
           <button
             onClick={togglePlayback}
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-all flex items-center justify-center ${
               isPlaying
-                ? 'bg-amber-500 text-slate-900 font-bold'
-                : 'bg-sky-500 hover:bg-sky-400 text-white'
+                ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/30'
+                : 'bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/30'
             }`}
-            title={isPlaying ? 'Pause' : 'Play Sequence'}
+            title={isPlaying ? 'Pause Timeline' : 'Play Auto-Regressive Rollout'}
           >
             {isPlaying ? (
-              <Pause className="w-3.5 h-3.5" />
+              <Pause className="w-4 h-4" />
             ) : (
-              <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+              <Play className="w-4 h-4 fill-current ml-0.5" />
             )}
           </button>
 
           <button
             onClick={() => setTimeIndex(Math.min(TIME_STEPS.length - 1, timeIndex + 1))}
             disabled={timeIndex === TIME_STEPS.length - 1}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 text-slate-300 transition-colors"
-            title="Step Forward"
+            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-25 text-slate-300 transition-colors"
+            title="Step Forward 15 Min"
           >
             <SkipForward className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Progress Slider */}
-      <div className="relative pt-1">
+      {/* Progress Range Slider */}
+      <div className="relative pt-1 px-1">
         <input
           type="range"
           min={0}
           max={TIME_STEPS.length - 1}
           value={timeIndex}
           onChange={(e) => setTimeIndex(Number(e.target.value))}
-          className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-400"
+          className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400 hover:accent-sky-300 transition-all"
         />
 
-        {/* Step Ticks Bar */}
-        <div className="flex justify-between items-center px-0.5 mt-1">
+        {/* Step Ticks Bar with Clear Division */}
+        <div className="flex justify-between items-center px-1 mt-2">
           {TIME_STEPS.map((step, idx) => {
             const isSelected = idx === timeIndex;
             const isNow = idx === 3;
@@ -94,26 +109,26 @@ export const TimeScrubber: React.FC = () => {
               <button
                 key={step.index}
                 onClick={() => setTimeIndex(idx)}
-                className={`flex flex-col items-center group transition-all`}
+                className="flex flex-col items-center group transition-all"
               >
                 <span
-                  className={`w-1.5 h-1.5 rounded-full mb-0.5 transition-all ${
+                  className={`rounded-full mb-1 transition-all ${
                     isSelected
-                      ? 'w-2 h-2 bg-sky-400 ring-2 ring-sky-400/50'
+                      ? 'w-2.5 h-2.5 bg-sky-400 ring-4 ring-sky-400/30 scale-125'
                       : isNow
-                      ? 'bg-emerald-400'
+                      ? 'w-2 h-2 bg-emerald-400 shadow-sm shadow-emerald-400'
                       : step.isForecast
-                      ? 'bg-slate-600 group-hover:bg-slate-400'
-                      : 'bg-slate-500 group-hover:bg-slate-400'
+                      ? 'w-1.5 h-1.5 bg-slate-600 group-hover:bg-slate-400'
+                      : 'w-1.5 h-1.5 bg-slate-500 group-hover:bg-slate-400'
                   }`}
                 />
                 <span
-                  className={`text-[9px] font-mono leading-none ${
+                  className={`text-[10px] font-mono leading-none ${
                     isSelected
-                      ? 'text-sky-400 font-extrabold scale-110'
+                      ? 'text-sky-400 font-black scale-110'
                       : isNow
                       ? 'text-emerald-400 font-bold'
-                      : 'text-slate-500'
+                      : 'text-slate-500 group-hover:text-slate-300'
                   }`}
                 >
                   {step.shortLabel}

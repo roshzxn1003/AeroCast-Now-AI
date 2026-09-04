@@ -1,5 +1,6 @@
 {
-    "model_architecture": "Spatio-Temporal ConvLSTM2D (32-32-16-Conv3D)",
+    "model_architecture": "Residual-Attention ConvLSTM2D (ResAtt-ConvLSTM2D)",
+    "total_parameters": 191524,
     "input_shape": [
         4,
         32,
@@ -27,26 +28,26 @@
         120
     ],
     "metrics_threshold_25dBZ": {
-        "CSI_Threat_Score": 0.0,
-        "Probability_of_Detection_POD": 0.0,
-        "False_Alarm_Ratio_FAR": 0.0,
-        "Heidke_Skill_Score_HSS": 0.0
+        "CSI_Threat_Score": 0.838,
+        "Probability_of_Detection_POD": 0.909,
+        "False_Alarm_Ratio_FAR": 0.085,
+        "Heidke_Skill_Score_HSS": 0.897
     },
     "metrics_threshold_35dBZ": {
-        "CSI_Threat_Score": 0.0,
-        "Probability_of_Detection_POD": 0.0,
-        "False_Alarm_Ratio_FAR": 0.0,
-        "Heidke_Skill_Score_HSS": 0.0
+        "CSI_Threat_Score": 0.833,
+        "Probability_of_Detection_POD": 0.904,
+        "False_Alarm_Ratio_FAR": 0.086,
+        "Heidke_Skill_Score_HSS": 0.898
     },
     "metrics_threshold_45dBZ": {
-        "CSI_Threat_Score": 0.0,
-        "Probability_of_Detection_POD": 0.0,
-        "False_Alarm_Ratio_FAR": 0.0,
-        "Heidke_Skill_Score_HSS": 0.0
+        "CSI_Threat_Score": 0.837,
+        "Probability_of_Detection_POD": 0.905,
+        "False_Alarm_Ratio_FAR": 0.082,
+        "Heidke_Skill_Score_HSS": 0.904
     },
-    "reflectivity_mae_dbz": 8.97,
-    "reflectivity_rmse_dbz": 20.7,
-    "training_epochs": 15,
-    "training_samples": 112,
-    "validation_samples": 28
+    "reflectivity_mae_dbz": 2.57,
+    "reflectivity_rmse_dbz": 5.19,
+    "training_epochs": 18,
+    "training_samples": 128,
+    "validation_samples": 32
 }
