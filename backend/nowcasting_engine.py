@@ -99,8 +99,9 @@ def build_convlstm_model(input_shape=(4, 32, 32, 4), output_steps=4) -> tf.keras
 
 def load_nowcasting_model() -> Tuple[tf.keras.Model, Dict[str, Any]]:
     """Loads pre-trained ConvLSTM weights or builds architecture fallback."""
-    model_path = "models/convlstm_nowcaster.keras"
-    meta_path = "models/model_metadata.json"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, "models", "convlstm_nowcaster.keras")
+    meta_path = os.path.join(base_dir, "models", "model_metadata.json")
     
     if os.path.exists(model_path):
         try:

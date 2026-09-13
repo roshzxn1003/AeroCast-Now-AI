@@ -25,7 +25,7 @@ import { Volume2, VolumeX, Sun, Moon, ZoomIn, ZoomOut, Compass, Navigation } fro
  * - Floating glassmorphic HUD for regional navigation & camera presets
  */
 
-const HOME_POV = { lat: 21.0, lng: 80.0, altitude: 1.65 };
+const HOME_POV = { lat: 21.0, lng: 80.0, altitude: 1.15 };
 
 const REGIONAL_PRESETS = [
   { id: 'all', label: 'All India', lat: 21.0, lng: 80.0, altitude: 1.65 },
@@ -56,7 +56,9 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   const [ready, setReady] = useState(false);
   const [hovered, setHovered] = useState<ConvectiveNode | null>(null);
   const [selectedCityInfo, setSelectedCityInfo] = useState<CityPreset | null>(null);
-  const [lastStrikeCount, setLastStrikeCount] = useState(0);
+  // Held in a ref, not state: this is a comparison baseline for the thunder
+  // trigger, and storing it in state made the strike effect re-enter itself.
+  const lastStrikeCountRef = useRef(0);
 
   // Zustand stores
   const convective = useLiveStore((s) => s.convective);
@@ -98,7 +100,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       .backgroundColor('rgba(0,0,0,0)')
       .globeImageUrl(globeImage)
       .bumpImageUrl('/textures/earth-topology.png')
-      .backgroundImageUrl('/textures/night-sky.png')
+      .backgroundImageUrl('/textures/night-sky.jpg')
       .showAtmosphere(true)
       .atmosphereColor(earthTheme === 'night' ? '#38bdf8' : '#60a5fa')
       .atmosphereAltitude(0.18)
@@ -115,12 +117,18 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       minDistance: number;
       maxDistance: number;
     };
-    controls.autoRotate = true;
+    controls.autoRotate = false;
     controls.autoRotateSpeed = 0.16;
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.minDistance = 101.5; // Surface is radius 100 — allows ultra-close city zoom!
     controls.maxDistance = 650;
+
+    // A globe is a smooth, mostly-curved subject: rendering beyond ~1.5x adds
+    // cost without visible benefit, and the transparent layers make every extra
+    // fragment expensive.
+    const renderer = globe.renderer();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 
     globeRef.current = globe;
 
@@ -140,7 +148,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         cloudsTexture.wrapT = THREE.ClampToEdgeWrapping;
 
         const cloudRadius = globe.getGlobeRadius() * 1.004;
-        const cloudGeo = new THREE.SphereGeometry(cloudRadius, 64, 64);
+        const cloudGeo = new THREE.SphereGeometry(cloudRadius, 48, 32);
         const cloudMat = new THREE.MeshPhongMaterial({
           map: cloudsTexture,
           transparent: true,
@@ -254,14 +262,14 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     });
 
     // Play synthesized rolling thunder sound if strike count increased
-    if (strikes.length > lastStrikeCount && soundEnabled) {
+    if (strikes.length > lastStrikeCountRef.current && soundEnabled) {
       const newest = strikes[0];
       // Stereo pan based on strike longitude relative to central Indian meridian (80°E)
       const pan = Math.max(-0.8, Math.min(0.8, (newest.lon - 80.0) / 12.0));
       thunderAudio.play(0.85, newest.type === 'CG', pan);
     }
-    setLastStrikeCount(strikes.length);
-  }, [strikes, ready, soundEnabled, lastStrikeCount]);
+    lastStrikeCountRef.current = strikes.length;
+  }, [strikes, ready, soundEnabled]);
 
   // ---------------------------------------------------------------------------
   // 7. Convective Sounding Nodes (Vigour Columns)
@@ -288,8 +296,8 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       .pointLat((d) => (d as ConvectiveNode).lat)
       .pointLng((d) => (d as ConvectiveNode).lon)
       .pointColor((d) => severityColor((d as ConvectiveNode).instability))
-      .pointAltitude((d) => 0.012 + (d as ConvectiveNode).intensity * 0.20)
-      .pointRadius((d) => ((d as ConvectiveNode).thunderstorm_observed ? 0.45 : 0.26))
+      .pointAltitude((d) => 0.008 + (d as ConvectiveNode).intensity * 0.11)
+      .pointRadius((d) => ((d as ConvectiveNode).thunderstorm_observed ? 0.22 : 0.13))
       .pointsMerge(false)
       .pointsTransitionDuration(600)
       .onPointClick((d) => handleNodeClick(d as ConvectiveNode))

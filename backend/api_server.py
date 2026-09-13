@@ -112,7 +112,8 @@ async def model_info():
     model, meta = _get_model()
 
     # Read metadata from file for ground truth
-    meta_path = "models/model_metadata.json"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    meta_path = os.path.join(base_dir, "models", "model_metadata.json")
     if os.path.exists(meta_path):
         with open(meta_path, "r") as f:
             file_meta = json.load(f)

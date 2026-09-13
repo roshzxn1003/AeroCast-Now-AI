@@ -266,9 +266,10 @@ def load_trained_pipeline():
     import joblib
     import tensorflow as tf
 
-    model_path = "models/weather_lstm.keras"
-    scaler_path = "models/scaler.pkl"
-    meta_path = "models/scaler_params.json"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, "models", "weather_lstm.keras")
+    scaler_path = os.path.join(base_dir, "models", "scaler.pkl")
+    meta_path = os.path.join(base_dir, "models", "scaler_params.json")
 
     model = None
     if os.path.exists(model_path):

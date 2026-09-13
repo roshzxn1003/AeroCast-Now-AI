@@ -27,8 +27,9 @@ class TestWeatherAIPipeline(unittest.TestCase):
         """Verify model weights and scaler artifacts exist and load correctly."""
         self.assertIsNotNone(self.model, "LSTM Model should not be None")
         self.assertIsNotNone(self.scaler, "MinMaxScaler should not be None")
-        self.assertTrue(os.path.exists("models/weather_lstm.keras"), "Saved .keras model must exist")
-        self.assertTrue(os.path.exists("models/scaler.pkl"), "Saved scaler.pkl must exist")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.assertTrue(os.path.exists(os.path.join(base_dir, "models", "weather_lstm.keras")), "Saved .keras model must exist")
+        self.assertTrue(os.path.exists(os.path.join(base_dir, "models", "scaler.pkl")), "Saved scaler.pkl must exist")
         
     def test_02_mock_sequence_generation(self):
         """Verify simulator generates valid (7, 5) shape within physical bounds."""

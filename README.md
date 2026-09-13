@@ -93,41 +93,46 @@ flowchart TD
 ### 1. Installation & Environment Setup
 ```bash
 # Clone the repository
-git clone <repo-url>
-cd SIH
+git clone https://github.com/roshzxn1003/AeroCast-Now-AI.git
+cd AeroCast-Now-AI
 
 # Activate Python virtual environment
 source venv/bin/activate
 
-# Install required dependencies
-pip install -r requirements.txt
+# Install backend dependencies
+pip install -r backend/requirements.txt
 ```
 
-### 2. Launch FastAPI REST Server & Mobile-First React App
+### 2. Launch FastAPI REST Server & React Frontend
 
 **Backend REST Server:**
 ```bash
+cd backend
 uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Mobile-First React Frontend:**
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-### 3. Launch the Streamlit Pro Dashboard (Legacy / Alternative UI)
+### 3. Launch the Streamlit Pro Dashboard (Alternative UI)
 ```bash
-python -m streamlit run app.py
+cd backend
+streamlit run app.py
 ```
 
 ### 4. Run the Automated Test Suite
 ```bash
-python test_nowcasting.py
+cd backend
+python -m unittest test_nowcasting.py test_pipeline.py
 ```
 
 ### 5. Retrain the ConvLSTM Neural Model (Optional)
 ```bash
+cd backend
 python train_nowcasting_model.py
 ```
 
@@ -136,29 +141,41 @@ python train_nowcasting_model.py
 ## 📂 Project Structure
 
 ```
-SIH/
-├── api_server.py              # FastAPI High-Performance REST API Layer (CORS, Swagger, REST endpoints)
-├── app.py                     # Streamlit Intelligence Dashboard (UI & CAP Exporter)
-├── nowcasting_engine.py       # Spatio-Temporal ConvLSTM Inference, SCIT Tracker & Lightning Jump Core
-├── observation_service.py     # Multi-Modal Ingestion (Radar DWR, Satellite INSAT-3D, Lightning LDN, NWP)
-├── train_nowcasting_model.py  # ConvLSTM Training Pipeline with Weighted Convective Loss
-├── test_nowcasting.py         # Automated Test Suite (7/7 Passing)
-├── requirements.txt           # Python dependency manifest (FastAPI, Uvicorn, TensorFlow, etc.)
-├── Dockerfile                 # Container deployment recipe
-├── README.md                  # Comprehensive Documentation & Architecture Guide
-├── REPORT.txt                 # Executive milestone summary
-├── frontend/                  # Mobile-First Meteorological React Application
+AeroCast-Now-AI/
+├── backend/                       # Python Backend & Deep Learning Services
+│   ├── api_server.py              # FastAPI High-Performance REST API Layer (14 endpoints)
+│   ├── app.py                     # Streamlit Meteorological Dashboard
+│   ├── live_data_service.py       # Real-time Blitzortung LDN WebSocket & Open-Meteo Ingest
+│   ├── nowcasting_engine.py       # ResAtt-ConvLSTM2D Model, SCIT Tracker & 2σ Lightning Jump Core
+│   ├── observation_service.py     # Multi-Modal Ingestion Simulator (DWR Radar, INSAT-3D, LDN, NWP)
+│   ├── weather_service.py         # Point-station weather forecasting & 1D LSTM model
+│   ├── train_nowcasting_model.py  # ConvLSTM Training Pipeline with Weighted Convective Loss
+│   ├── train_model.py             # 1D LSTM Training Pipeline
+│   ├── test_nowcasting.py         # Primary Automated Test Suite (7/7 Passing)
+│   ├── test_pipeline.py           # Secondary Pipeline Test Suite (7/7 Passing)
+│   ├── requirements.txt           # Python dependency manifest (FastAPI, TensorFlow, websockets, etc.)
+│   ├── Dockerfile                 # Backend container deployment recipe
+│   └── models/                    # AI Checkpoints & Scalers
+│       ├── convlstm_nowcaster.keras # Trained Spatio-Temporal ConvLSTM Model Checkpoint (191K params)
+│       ├── model_metadata.json      # Model metrics and CSI/POD/FAR skill scores
+│       ├── weather_lstm.keras       # 1D Synoptic LSTM model checkpoint
+│       ├── scaler.pkl               # Feature scaler
+│       ├── scaler_params.json       # Scaler metadata
+│       └── training_performance.png # Convergence loss plot
+├── frontend/                      # React 19 + TypeScript + Vite 6 Application
+│   ├── public/
+│   │   ├── textures/              # Offline photorealistic Earth textures, clouds & starry sky
+│   │   └── geo/                   # Indian states & national boundaries GeoJSON
 │   ├── src/
-│   │   ├── components/        # Header, BottomNav, MetricCards, LightningJumpBanner, TimeScrubber, RadarViewport
-│   │   ├── pages/             # NowcastScreen, AlertsScreen, StormsScreen, RiskScreen, MoreScreen
-│   │   ├── services/          # REST API Client with robust offline simulated fallback
-│   │   ├── store/             # Zustand global reactive state & animation loop
-│   │   └── types/             # Meteorological data types and interfaces
-│   ├── package.json           # React 19, TypeScript, Tailwind v4, Lucide, Recharts
-│   └── vite.config.ts         # Vite build configuration with API reverse proxy
-└── models/
-    ├── convlstm_nowcaster.keras # Trained Spatio-Temporal ConvLSTM Model Checkpoint
-    ├── model_metadata.json      # Model metrics and architecture metadata
-    └── training_performance.png # Convergence loss plot
+│   │   ├── components/            # CommandBar, LightningGlobe (3D WebGL), RadarViewport, BottomNav
+│   │   ├── effects/               # lightningGenerator.ts (3D fractal bolts) & thunderAudio.ts (synthesizer)
+│   │   ├── utils/                 # weatherInterpreter.ts (Plain-English safety translator)
+│   │   ├── pages/                 # CommandScreen, AlertsScreen, StormsScreen, RiskScreen, MoreScreen
+│   │   ├── services/              # REST API Client with robust offline simulated fallback
+│   │   ├── store/                 # Zustand global reactive state (nowcastStore & liveStore)
+│   │   └── types/                 # Meteorological data types and interfaces
+│   ├── package.json               # React 19, Three.js, Globe.gl, Tailwind v4, Lucide, Recharts
+│   └── vite.config.ts             # Vite build configuration with API reverse proxy
+└── README.md                      # Comprehensive Documentation & Architecture Guide
 ```
 

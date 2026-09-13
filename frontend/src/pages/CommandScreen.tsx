@@ -233,15 +233,38 @@ const GlobeLegend: React.FC<{ uiMode: 'citizen' | 'pro' }> = ({ uiMode }) => (
         <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wide">
           Map Legend
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-slate-300">
+        <div className="space-y-1.5 text-[10px] text-slate-300">
+          {/* Each row names what is actually drawn. The pulsing cyan markers
+              are cities, not flashes — labelling them as strikes misread the
+              single most prominent thing on the map. */}
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-            <span className="w-2 h-2 rounded-full bg-cyan-400" />
-            Active Strikes
+            <span className="relative flex items-center justify-center w-3">
+              <span className="absolute w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+              <span className="relative w-2 h-2 rounded-full bg-cyan-400" />
+            </span>
+            City — tap to zoom in
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400" />
-            Storm Energy Column
+            <span className="flex rounded-full overflow-hidden h-2 w-10">
+              {SEVERITY_LEVELS.map((level) => (
+                <span
+                  key={level}
+                  className="flex-1"
+                  style={{ background: SEVERITY_COLOR[level] }}
+                />
+              ))}
+            </span>
+            Storm energy — calm to extreme
+          </span>
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ background: FLASH.cg }} />
+              Ground strike
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ background: FLASH.ic }} />
+              In-cloud
+            </span>
           </span>
         </div>
         <p className="text-[10px] text-slate-400 max-w-[15rem] leading-snug">

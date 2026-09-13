@@ -57,7 +57,7 @@ export const useLiveStore = create<LiveState>((set, get) => ({
 
   refreshStrikes: async () => {
     try {
-      const lightning = await fetchLightningField(30, 3000);
+      const lightning = await fetchLightningField(30, 1200);
       set({ lightning, lastUpdated: new Date().toISOString(), lastError: null });
     } catch (err) {
       set({ lastError: (err as Error).message });
@@ -71,7 +71,7 @@ export const useLiveStore = create<LiveState>((set, get) => ({
     const [summary, convective, lightning, network] = await Promise.allSettled([
       fetchDomainSummary(),
       fetchConvectiveField(),
-      fetchLightningField(30, 3000),
+      fetchLightningField(30, 1200),
       fetchNetworkStatus(),
     ]);
 
