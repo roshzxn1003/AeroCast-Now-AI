@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import math
 import random
+import ssl
 import threading
 import time
 from dataclasses import dataclass, field
@@ -279,7 +280,7 @@ BLITZORTUNG_HOSTS = [
     "ws7.blitzortung.org",
     "ws8.blitzortung.org",
 ]
-BLITZORTUNG_PORT = 3000
+BLITZORTUNG_PORT = 443
 
 
 def _lzw_decode(payload: str) -> str:
@@ -387,12 +388,16 @@ class BlitzortungClient:
             self._stop.set()
             return
 
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
         for host in BLITZORTUNG_HOSTS:
             if self._stop.is_set():
                 return
-            url = f"ws://{host}:{BLITZORTUNG_PORT}/"
+            url = f"wss://{host}/"
             try:
-                async with websockets.connect(url, open_timeout=8, ping_interval=20) as ws:
+                async with websockets.connect(url, ssl=ssl_ctx, open_timeout=8, ping_interval=20) as ws:
                     await ws.send(json.dumps({"a": 111}))
                     self.connected = True
                     self.last_error = None
@@ -407,10 +412,15 @@ class BlitzortungClient:
 
     def _ingest(self, raw: str) -> None:
         try:
-            decoded = _lzw_decode(raw) if not raw.lstrip().startswith("{") else raw
-            msg = json.loads(decoded)
-        except Exception:  # noqa: BLE001 - skip malformed frames
-            return
+            msg = json.loads(raw)
+        except Exception:
+            try:
+                decoded = _lzw_decode(raw)
+                msg = json.loads(decoded)
+            except Exception:  # noqa: BLE001 - skip malformed frames
+                return
+
+        self.total_received += 1
 
         lat = msg.get("lat")
         lon = msg.get("lon")
@@ -438,7 +448,6 @@ class BlitzortungClient:
             "provider": "Blitzortung.org LDN",
         }
 
-        self.total_received += 1
         with self._lock:
             self._strikes.append(strike)
             self._prune_locked()
@@ -467,12 +476,13 @@ def start_lightning_network() -> None:
 def ldn_status() -> Dict[str, Any]:
     return {
         "connected": _ldn_client.connected,
+        "status": "LIVE" if _ldn_client.connected else "UNAVAILABLE",
         "buffered_strikes": len(_ldn_client.snapshot()),
         "total_received": _ldn_client.total_received,
         "last_error": _ldn_client.last_error,
         "started_at": _ldn_client.started_at,
         "provider": "Blitzortung.org LDN",
-        "transport": f"websocket :{BLITZORTUNG_PORT}",
+        "transport": f"wss :{BLITZORTUNG_PORT}",
     }
 
 
@@ -600,17 +610,24 @@ def get_lightning_field(window_minutes: int = _STRIKE_WINDOW_MIN) -> Dict[str, A
     measured = _ldn_client.snapshot()
     convective = fetch_live_convective()
 
-    if _ldn_client.connected and measured:
-        strikes = measured
-        status = "LIVE"
-        note = "Measured cloud-to-ground and intra-cloud geolocations from the Blitzortung detection network."
+    if _ldn_client.connected:
+        if measured:
+            strikes = measured
+            status = "LIVE"
+            note = "Measured real-time cloud-to-ground and intra-cloud geolocations from the Blitzortung detection network."
+        else:
+            strikes = derive_strike_field(convective, window_minutes)
+            status = "LIVE-STANDBY"
+            note = (
+                f"Blitzortung LDN connected & operational ({_ldn_client.total_received} global strikes parsed). "
+                f"Zero active strikes detected in India domain over last {window_minutes}m (displaying live convective sounding estimates)."
+            )
     else:
         strikes = derive_strike_field(convective, window_minutes)
-        status = "LIVE-DERIVED"
+        status = "DERIVED-FALLBACK"
         note = (
-            "Lightning detection network unreachable. Flash field derived from live "
-            "CAPE, Lifted Index and observed WMO weather codes — physically weighted, "
-            "not measured."
+            f"Blitzortung LDN unreachable ({_ldn_client.last_error or 'offline'}). "
+            "Flash field derived from live CAPE, Lifted Index and observed WMO weather codes — physically weighted, not measured."
         )
 
     cg = sum(1 for s in strikes if s["type"] == "CG")

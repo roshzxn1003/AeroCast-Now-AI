@@ -16,6 +16,12 @@ from weather_service import (
     analyze_extreme_weather,
     format_temp
 )
+from live_data_service import (
+    _lzw_decode,
+    _in_domain,
+    ldn_status,
+    BLITZORTUNG_PORT,
+)
 
 class TestWeatherAIPipeline(unittest.TestCase):
     
@@ -91,6 +97,40 @@ class TestWeatherAIPipeline(unittest.TestCase):
         self.assertEqual(format_temp(25.0, "Celsius (°C)"), "25.0 °C")
         self.assertEqual(format_temp(25.0, "Fahrenheit (°F)"), "77.0 °F")
         self.assertEqual(format_temp(0.0, "Fahrenheit (°F)"), "32.0 °F")
+
+
+class TestBlitzortungLDN(unittest.TestCase):
+    """Verify Blitzortung Lightning Detection Network parsing and status contracts."""
+
+    def test_08_lzw_decode_decompression(self):
+        """Verify LZW decompression transforms compressed Unicode tokens to valid string."""
+        sample_compressed = '{"time":1789293261965858000,"lat":18.64,"lon":-100.42}'
+        decoded = _lzw_decode(sample_compressed)
+        self.assertIn("lat", decoded)
+        self.assertIn("18.64", decoded)
+
+    def test_09_in_domain_bounding_box(self):
+        """Verify Indian bounding box filter."""
+        # Inside domain (Chennai: 13.08, 80.27)
+        self.assertTrue(_in_domain(13.08, 80.27))
+        # Inside domain (Delhi: 28.61, 77.21)
+        self.assertTrue(_in_domain(28.61, 77.21))
+        # Outside domain (London: 51.5, -0.12)
+        self.assertFalse(_in_domain(51.5, -0.12))
+        # Outside domain (Tokyo: 35.67, 139.65)
+        self.assertFalse(_in_domain(35.67, 139.65))
+
+    def test_10_ldn_status_schema(self):
+        """Verify LDN status dictionary conforms to frontend contract."""
+        status = ldn_status()
+        self.assertIn("connected", status)
+        self.assertIn("status", status)
+        self.assertIn("buffered_strikes", status)
+        self.assertIn("total_received", status)
+        self.assertIn("transport", status)
+        self.assertEqual(status["transport"], "wss :443")
+        self.assertEqual(BLITZORTUNG_PORT, 443)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

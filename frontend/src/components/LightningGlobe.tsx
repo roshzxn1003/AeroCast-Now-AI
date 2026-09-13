@@ -348,13 +348,19 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       .htmlElement((d: object) => {
         const city = d as CityPreset;
         const el = document.createElement('div');
-        el.className = 'group cursor-pointer pointer-events-auto flex items-center gap-1.5 transform -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-125';
+        // The marker dot is centred exactly on the city's coordinate and the
+        // name is positioned beside it. Laying the two out as a centred flex
+        // row, as this previously did, pushed the dot half a label-width off
+        // its true position — an error that grew with the length of the name.
+        el.className =
+          'group cursor-pointer pointer-events-auto relative transform -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-125';
+        const onLeft = city.labelSide === 'left';
         el.innerHTML = `
-          <div class="relative flex items-center justify-center">
+          <div class="relative flex items-center justify-center w-2.5 h-2.5">
             <span class="animate-ping absolute inline-flex h-3.5 w-3.5 rounded-full bg-cyan-400 opacity-75"></span>
             <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500 border border-white"></span>
           </div>
-          <span class="bg-slate-900/90 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/40 shadow-lg backdrop-blur-sm whitespace-nowrap">
+          <span class="absolute top-1/2 -translate-y-1/2 ${onLeft ? 'right-full mr-1.5' : 'left-full ml-1.5'} bg-slate-900/90 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/40 shadow-lg backdrop-blur-sm whitespace-nowrap">
             ${city.name}
           </span>
         `;

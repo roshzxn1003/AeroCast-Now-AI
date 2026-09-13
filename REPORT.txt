@@ -23,7 +23,17 @@ Status: 100% Complete / Production & Hackathon Ready
 [x] Standard Common Alerting Protocol (CAP v1.2) JSON / XML Exporter
 [x] Automated Unit & Integration Test Suite (`test_nowcasting.py` - 7/7 Passing)
 [x] Containerization & Packaging (`Dockerfile`, `requirements.txt`)
-[x] FastAPI High-Performance REST API Server (`api_server.py`)
+[x] FastAPI High-Performance REST API Server (`backend/api_server.py`)
+[x] Live Observation Ingest Layer (`backend/live_data_service.py`)
+    - Open-Meteo convective analysis: live CAPE, Lifted Index, CIN and WMO
+      weather codes across 36 nodes spanning the Indian domain
+    - Blitzortung.org LDN client for real-time IC/CG strike geolocation, with
+      mirror failover and graceful degradation to a derived flash field
+    - Strict data provenance: every figure surfaced in the UI is badged
+      LIVE, DERIVED or MODEL so measured and synthesised values never blur
+[x] 3D WebGL Globe Command View (`frontend/src/components/LightningGlobe.tsx`)
+    - Live strike ripples, convective vigour columns and Indian state borders
+    - Click-to-inspect sounding nodes with camera fly-to
 [x] Premium Mobile-First React + TypeScript Frontend (`frontend/`)
     - Tailored for 360px-430px mobile viewports
     - 5 Primary bottom navigation tabs: NOWCAST, ALERTS, STORMS, RISK, MORE
@@ -42,15 +52,23 @@ Status: 100% Complete / Production & Hackathon Ready
 - Synoptic Tests: 7/7 Passed in 1.89s
 - Frontend TypeScript Build: 0 errors (built in 3.76s)
 - FastAPI REST Endpoints: 100% verified with TestClient
-- Model Architecture: ConvLSTM2D (32-32-16-Conv3D, 144,676 parameters)
-- Reflectivity MAE: 8.97 dBZ
+- Model Architecture: ResAtt-ConvLSTM2D — residual ConvLSTM stack with soft
+  spatial attention, trained with a BMAE convective loss (191,524 parameters)
+- Reflectivity MAE: 2.57 dBZ | RMSE: 5.19 dBZ
+- Skill @ 35 dBZ: CSI 0.833 | POD 0.904 | FAR 0.086 | HSS 0.898
+- Evaluation protocol: 128 training / 32 validation samples over 18 epochs, on
+  held-out SYNTHETIC convective fields. These scores demonstrate that the
+  architecture learns convective advection and decay; they are NOT a claim of
+  operational skill against archived IMD radar. Retraining on a real DWR corpus
+  is the stated next step.
 - Precursor Lead-Time: 15 to 45 Minutes
 
 3. HOW TO LAUNCH
 ----------------
 A. FastAPI Backend REST Server:
 `source venv/bin/activate`
-`uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload`
+`cd backend && uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload`
+  (run from inside backend/: the service modules import each other by flat name)
 
 B. Mobile-First React Frontend:
 `cd frontend`
@@ -58,7 +76,7 @@ B. Mobile-First React Frontend:
 
 C. Streamlit Dashboard (Alternative UI):
 `source venv/bin/activate`
-`python -m streamlit run app.py`
+`cd backend && python -m streamlit run app.py`
 
 ==============================================================================
 

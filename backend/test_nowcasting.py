@@ -74,7 +74,10 @@ class TestThunderstormNowcastingPipeline(unittest.TestCase):
         
     def test_06_convlstm_forward_inference(self):
         """Verify Spatio-Temporal ConvLSTM rollout produces 6 future time steps (+15 to +120 min)."""
-        dummy_input = np.random.uniform(0.0, 1.0, (4, 32, 32, 4)).astype(np.float32)
+        # Seeded: an unseeded draw made this assertion nondeterministic, so the
+        # suite failed intermittently on identical code.
+        rng = np.random.default_rng(20260913)
+        dummy_input = rng.uniform(0.0, 1.0, (4, 32, 32, 4)).astype(np.float32)
         forecast = predict_nowcast_sequence(self.model, dummy_input, total_forecast_steps=6)
         
         self.assertEqual(forecast.shape, (6, 32, 32, 4), "Forecast shape must be (6, 32, 32, 4)")

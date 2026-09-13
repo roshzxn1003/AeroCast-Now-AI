@@ -188,6 +188,11 @@ export const NetworkStatusPanel: React.FC = () => {
           <p className="text-[11px] text-[var(--color-ink-faint)] ml-5 mt-0.5">
             {p.role}
           </p>
+          {p.id === 'ldn' && p.connected && (
+            <p className="text-[10px] font-mono text-[var(--color-prov-live)] ml-5 mt-0.5">
+              {p.buffered_strikes ?? 0} in domain &bull; {p.total_received ?? 0} global parsed ({p.transport ?? 'wss :443'})
+            </p>
+          )}
           {p.id === 'ldn' && !p.connected && p.last_error && (
             <p className="text-[10px] font-mono text-[var(--color-ink-faint)] ml-5 mt-1">
               {p.last_error} — falling back to derived field
