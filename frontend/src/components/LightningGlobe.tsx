@@ -368,13 +368,19 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         el.addEventListener('click', () => {
           setSelectedCityInfo(city);
           setSelectedStation(city.stationName);
+          const matchNode = (nodes as ConvectiveNode[]).find(
+            (n) =>
+              n.name.toLowerCase().includes(city.name.toLowerCase()) ||
+              city.name.toLowerCase().includes(n.name.toLowerCase())
+          );
+          if (matchNode) setFocusedNode(matchNode);
           // Smooth 3D dive directly down to city level!
           globe.pointOfView({ lat: city.lat, lng: city.lng, altitude: 0.18 }, 1400);
         });
 
         return el;
       });
-  }, [ready, setSelectedStation]);
+  }, [ready, setSelectedStation, setFocusedNode, nodes]);
 
   // ---------------------------------------------------------------------------
   // 10. Camera Zoom & Navigation Helpers
@@ -420,18 +426,18 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         aria-label="Interactive 3D Convective Earth Globe with Procedural Lightning"
       />
 
-      {/* Hovered Sounding Node Tooltip */}
+      {/* Hovered Sounding Node Tooltip (Positioned beside top-left Strike HUD without overlap) */}
       {hovered && (
         <div
-          className="absolute top-4 left-4 z-20 pointer-events-none panel px-3.5 py-2.5 enter backdrop-blur-md"
-          style={{ background: 'rgba(11, 15, 20, 0.92)', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+          className="absolute top-20 sm:top-4 left-4 sm:left-[220px] z-20 pointer-events-none panel px-3.5 py-2 enter backdrop-blur-md rounded-xl shadow-xl"
+          style={{ background: 'rgba(11, 15, 20, 0.94)', border: '1px solid rgba(56, 189, 248, 0.35)' }}
         >
-          <div className="text-[13px] font-bold text-white flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full" style={{ background: severityColor(hovered.instability) }} />
-            {hovered.name}
+          <div className="text-[12px] font-bold text-white flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: severityColor(hovered.instability) }} />
+            <span>{hovered.name}</span>
+            <span className="text-[10px] text-slate-400 font-normal">({hovered.region})</span>
           </div>
-          <div className="text-[11px] text-slate-400">{hovered.region}</div>
-          <div className="mt-2 flex items-center gap-3 font-mono text-[11px]">
+          <div className="mt-1 flex items-center gap-2.5 font-mono text-[11px]">
             <span style={{ color: severityColor(hovered.instability) }}>
               {hovered.instability}
             </span>
@@ -441,20 +447,22 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         </div>
       )}
 
-      {/* Selected City Inspector Card */}
+      {/* Selected City Inspector Card (Positioned cleanly beside Strike HUD with zero collision) */}
       {selectedCityInfo && (
-        <div className="absolute top-4 left-4 z-20 panel p-3.5 enter backdrop-blur-md max-w-xs bg-slate-900/95 border border-cyan-500/50 shadow-2xl">
+        <div className="absolute top-20 sm:top-4 left-4 sm:left-[220px] z-20 panel p-3.5 enter backdrop-blur-md max-w-xs bg-slate-900/95 border border-cyan-500/50 shadow-2xl rounded-xl">
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+              <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
                 City Radar Inspection
               </div>
-              <div className="text-base font-bold text-white">{selectedCityInfo.name}</div>
+              <div className="text-base font-bold text-white mt-0.5">{selectedCityInfo.name}</div>
               <div className="text-[11px] text-slate-400">{selectedCityInfo.state}</div>
             </div>
             <button
               onClick={() => setSelectedCityInfo(null)}
-              className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800"
+              className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition-colors ml-2"
+              title="Close inspection"
             >
               ✕
             </button>
@@ -462,7 +470,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
           <div className="mt-2.5 pt-2 border-t border-slate-800 text-[11px] text-slate-300 space-y-1">
             <div className="flex justify-between">
               <span className="text-slate-400">Doppler Radar:</span>
-              <span className="font-mono text-cyan-300">{selectedCityInfo.dwrRadarName}</span>
+              <span className="font-mono text-cyan-300 font-semibold">{selectedCityInfo.dwrRadarName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Scan Range:</span>

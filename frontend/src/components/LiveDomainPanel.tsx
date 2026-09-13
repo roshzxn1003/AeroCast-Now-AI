@@ -206,14 +206,26 @@ export const NetworkStatusPanel: React.FC = () => {
 
 /** Detail readout for whichever node the operator has selected on the globe. */
 export const NodeDetailPanel: React.FC = () => {
-  const node = useLiveStore((s) => s.focusedNode);
+  const focusedNode = useLiveStore((s) => s.focusedNode);
+  const convective = useLiveStore((s) => s.convective);
+
+  // If no node is manually clicked, automatically inspect the highest-intensity convective node
+  const node = useMemo(() => {
+    if (focusedNode) return focusedNode;
+    if (convective?.nodes && convective.nodes.length > 0) {
+      return [...convective.nodes].sort((a, b) => b.intensity - a.intensity)[0];
+    }
+    return null;
+  }, [focusedNode, convective]);
+
+  const isAutoSelected = !focusedNode && !!node;
 
   if (!node) {
     return (
-      <Panel title="Node Detail">
+      <Panel title="Sounding Telemetry">
         <EmptyState
-          title="No node selected"
-          detail="Select a point on the globe to inspect its live sounding."
+          title="Awaiting Convective Soundings"
+          detail="Observation network sounding data will appear here once ingested."
         />
       </Panel>
     );
@@ -224,7 +236,7 @@ export const NodeDetailPanel: React.FC = () => {
   return (
     <Panel
       title={node.name}
-      subtitle={node.region}
+      subtitle={isAutoSelected ? `${node.region} • Highest Instability Core` : `${node.region} • Focused Sounding`}
       action={
         <>
           <Badge color={tone}>{node.instability}</Badge>
