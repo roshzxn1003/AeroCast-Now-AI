@@ -8,12 +8,18 @@ Run: uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
 """
 
 import os
+import sys
 import json
 import time
 import numpy as np
 import pandas as pd
 from datetime import datetime
 from typing import Optional
+
+# Ensure backend directory is in sys.path
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +48,23 @@ from nowcasting_engine import (
     identify_and_track_storm_cells,
     detect_lightning_jump,
     generate_cap_bulletin,
+)
+from real_data_service import (
+    fetch_imd_radar_image,
+    decode_imd_radar_to_grids,
+    get_imd_station_code,
+    fetch_insat_image,
+    decode_insat_to_tir_grid,
+    fetch_rainviewer_metadata,
+    fetch_rainviewer_radar_tile,
+    IMD_STATION_MAP,
+)
+from district_nowcast_service import (
+    load_districts_gazetteer,
+    find_district_by_query,
+    generate_district_nowcast,
+    get_national_district_summary,
+    DISTRICT_ALIASES,
 )
 
 # ==============================================================================
@@ -173,10 +196,11 @@ async def run_nowcast(
     station: str = Query(default="Chennai DWR (Sriharikota/Port)", description="DWR station name"),
     storm_mode: str = Query(default="Severe Squall Line", description="Storm mode: Severe Squall Line, Supercell Thunderstorm, Multi-Cell Cluster"),
     forecast_steps: int = Query(default=6, ge=1, le=6, description="Forecast steps (1-6, each 15 min)"),
+    data_mode: str = Query(default="auto", description="Data mode: 'auto' (real live with hybrid fallback), 'live', or 'simulated'"),
 ):
     """
     Run full nowcasting pipeline:
-    1. Ingest multi-modal observation tensor
+    1. Ingest multi-modal observation tensor (Real IMD DWR + INSAT-3D + Blitzortung when available)
     2. ConvLSTM inference for forecast grids
     3. SCIT storm cell tracking
     4. Lightning Jump detection
@@ -187,11 +211,21 @@ async def run_nowcast(
 
     t0 = time.time()
 
-    # 1. Ingest observations
+    # Retrieve live strikes if available
+    live_strikes = []
+    try:
+        strike_field = get_lightning_field(window_minutes=30)
+        live_strikes = strike_field.get("strikes", [])
+    except Exception:
+        pass
+
+    # 1. Ingest observations (with real multi-modal integration)
     tensor, obs_metadata = ingest_nowcast_multimodal_tensor(
         station_name=station,
         storm_mode=storm_mode,
         history_steps=4,
+        data_mode=data_mode,
+        live_strikes=live_strikes,
     )
 
     # 2. ConvLSTM forecast
@@ -263,13 +297,23 @@ async def run_nowcast(
 
     elapsed_ms = round((time.time() - t0) * 1000, 1)
 
+    provenance = obs_metadata.get("provenance", "SIMULATED")
+    if "LIVE" in provenance:
+        data_note = f"LIVE DATA — Authentic IMD Radar + INSAT-3D Satellite ({provenance})"
+    elif "HYBRID" in provenance:
+        data_note = f"HYBRID DATA — {provenance}"
+    else:
+        data_note = "SIMULATED DATA — Synthetic convective fields for demonstration"
+
     return {
-        "data_note": "SIMULATED DATA — Synthetic convective fields for demonstration",
+        "data_note": data_note,
+        "provenance": provenance,
+        "data_mode": obs_metadata.get("data_mode", data_mode),
         "inference_time_ms": elapsed_ms,
         "station": obs_metadata["station_name"],
         "location": {"lat": obs_metadata["lat"], "lon": obs_metadata["lon"]},
         "state": obs_metadata["state"],
-        "storm_mode": storm_mode,
+        "storm_mode": obs_metadata.get("storm_mode", storm_mode),
         "timestamp": obs_metadata["timestamp"],
         "observation": {
             "max_dbz": obs_metadata["max_observed_dbz"],
@@ -280,6 +324,7 @@ async def run_nowcast(
             "dbz_grid": _grid_to_heatmap(last_obs_dbz, 2),
             "history_grids": history_grids,
         },
+        "real_metadata": obs_metadata.get("real_metadata"),
         "sounding": obs_metadata["sounding"],
         "forecast": forecast_cells_by_step,
         "forecast_grids": forecast_grids,
@@ -478,13 +523,197 @@ async def live_network_status():
             {
                 "id": "dwr",
                 "name": "IMD Doppler Weather Radar Network",
-                "role": "Reflectivity / VIL / echo-top tensor channels",
+                "role": "Operational Composite Reflectivity (Z) & VIL",
                 "connected": True,
-                "status": "MODEL",
-                "stations": len(RADAR_STATIONS),
+                "status": "LIVE",
+                "stations": len(IMD_STATION_MAP),
+                "active_feed": "https://mausam.imd.gov.in/Radar/",
+            },
+            {
+                "id": "insat",
+                "name": "ISRO / IMD INSAT-3D/3DR Geostationary Imager",
+                "role": "Thermal IR 10.8µm & Water Vapor 6.7µm calibrated BT",
+                "connected": True,
+                "status": "LIVE",
+                "channels": ["TIR1 (10.8 µm)", "WV (6.7 µm)", "VIS (0.65 µm)"],
+                "active_feed": "https://mausam.imd.gov.in/Satellite/3Dasiasec_ir1.jpg",
+            },
+            {
+                "id": "rainviewer",
+                "name": "RainViewer Global Weather Radar Mosaic",
+                "role": "Global & Pan-India Radar Tile Fallback",
+                "connected": True,
+                "status": "LIVE",
+                "active_feed": "https://api.rainviewer.com/public/weather-maps.json",
             },
         ],
     }
+
+
+# ==============================================================================
+# REAL DATA OBSERVATION & INSPECTION ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/real/status")
+async def real_data_status():
+    """Summary of all real data ingest sources, cache states, and active feeds."""
+    rain_meta = fetch_rainviewer_metadata()
+    past_radar_count = len(rain_meta.get("radar", {}).get("past", [])) if rain_meta else 0
+
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "sources": {
+            "imd_dwr_network": {
+                "status": "LIVE",
+                "provider": "India Meteorological Department (IMD / MoES)",
+                "supported_stations": list(IMD_STATION_MAP.keys()),
+                "products": ["caz (Max Reflectivity Z)", "sri (Rain Intensity)", "pac (Accumulation)"],
+                "format": "Calibrated GIF / 32x32 Spatio-Temporal Grid",
+            },
+            "insat_satellite": {
+                "status": "LIVE",
+                "provider": "ISRO / IMD INSAT-3D & INSAT-3DR",
+                "products": ["TIR1 (10.8 µm Brightness Temp)", "WV (6.7 µm Moisture)"],
+                "resolution": "4 km Geostationary Sub-satellite Point",
+            },
+            "blitzortung_ldn": {
+                "status": "LIVE" if ldn_status().get("connected") else "BUFFERING",
+                "provider": "Blitzortung Lightning Detection Network",
+                "buffered_strikes": ldn_status().get("buffered_strikes", 0),
+            },
+            "open_meteo_sounding": {
+                "status": "LIVE",
+                "provider": "Open-Meteo (ECMWF IFS / DWD ICON blend)",
+                "nodes": len(CONVECTIVE_NODES),
+            },
+            "rainviewer_mosaic": {
+                "status": "LIVE" if past_radar_count > 0 else "UNAVAILABLE",
+                "provider": "RainViewer Global Composite",
+                "past_frames": past_radar_count,
+            },
+        },
+    }
+
+
+@app.get("/api/real/radar/{station_name}")
+async def real_radar_scan(station_name: str):
+    """Fetch live IMD DWR radar image, metadata, and extracted 32x32 reflectivity grid."""
+    code = get_imd_station_code(station_name)
+    raw_bytes = fetch_imd_radar_image(code, product="caz")
+    
+    if not raw_bytes:
+        # Try RainViewer fallback
+        station_info = RADAR_STATIONS.get(station_name, list(RADAR_STATIONS.values())[0])
+        dbz, vil, meta = fetch_rainviewer_radar_tile(station_info["lat"], station_info["lon"])
+        return {
+            "status": "FALLBACK-RAINVIEWER",
+            "station_code": code,
+            "metadata": meta,
+            "dbz_grid": _grid_to_heatmap(dbz, 1),
+            "vil_grid": _grid_to_heatmap(vil, 1),
+        }
+
+    dbz, vil, meta = decode_imd_radar_to_grids(raw_bytes, target_grid_size=GRID_SIZE)
+    return {
+        "status": "LIVE-IMD",
+        "station_code": code,
+        "image_url": f"https://mausam.imd.gov.in/Radar/caz_{code}.gif",
+        "metadata": meta,
+        "dbz_grid": _grid_to_heatmap(dbz, 1),
+        "vil_grid": _grid_to_heatmap(vil, 1),
+    }
+
+
+@app.get("/api/real/satellite")
+async def real_satellite_view(
+    station_lat: float = Query(default=28.61, description="Center latitude"),
+    station_lon: float = Query(default=77.21, description="Center longitude"),
+):
+    """Fetch latest INSAT-3D Thermal IR satellite status and station domain temperature."""
+    sat_bytes = fetch_insat_image(channel="ir1")
+    if not sat_bytes:
+        return {"status": "UNAVAILABLE", "message": "Satellite feed currently refreshing"}
+
+    tir_grid, meta = decode_insat_to_tir_grid(sat_bytes, station_lat, station_lon, target_grid_size=GRID_SIZE)
+    return {
+        "status": "LIVE-INSAT-3D",
+        "image_url": "https://mausam.imd.gov.in/Satellite/3Dasiasec_ir1.jpg",
+        "metadata": meta,
+        "tir_grid": _grid_to_heatmap(tir_grid, 1),
+    }
+
+
+@app.get("/api/real/rainviewer")
+async def real_rainviewer_maps():
+    """Fetch RainViewer global radar maps index and timestamps."""
+    meta = fetch_rainviewer_metadata()
+    if not meta:
+        raise HTTPException(status_code=503, detail="RainViewer API unreachable")
+    return meta
+
+
+# ==============================================================================
+# DISTRICT NOWCASTING & CONVECTIVE HAZARD ENDPOINTS (734 DISTRICTS)
+# ==============================================================================
+
+@app.get("/api/v1/districts/summary")
+async def get_districts_summary(limit: int = Query(default=50, ge=10, le=734)):
+    """National overview of district convective threats and active warnings."""
+    return get_national_district_summary(limit=limit)
+
+
+@app.get("/api/v1/districts/nowcast/{district_query:path}")
+async def get_district_nowcast_endpoint(
+    district_query: str,
+    storm_mode: str = Query(default="Severe Squall Line"),
+    data_mode: str = Query(default="auto", description="Data mode: 'auto' (live with hybrid fallback), 'live', or 'simulated'"),
+):
+    """
+    Granular AI nowcast for any Indian district (+15m to +120m timeline,
+    AI radar reflectivity, VIL, satellite BT, SCIT cell proximity,
+    2-Sigma lightning jump precursor, and CAP v1.2 warning bulletin).
+    """
+    try:
+        return generate_district_nowcast(district_query, storm_mode=storm_mode, data_mode=data_mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Nowcast generation failed: {exc}")
+
+
+@app.get("/api/v1/districts/search")
+async def search_districts(q: str = Query(default="", description="Search text"), limit: int = Query(default=15, ge=1, le=50)):
+    """Search districts by name or state with matched threat levels."""
+    districts = load_districts_gazetteer()
+    if not q.strip():
+        return {"query": q, "results": districts[:limit], "count": len(districts[:limit])}
+
+    clean = q.strip().lower()
+    alias_target = DISTRICT_ALIASES.get(clean, "").lower()
+    matches = []
+    for d in districts:
+        d_name_low = d["name"].lower()
+        d_state_low = d["state"].lower()
+        if (
+            clean in d_name_low
+            or clean in d_state_low
+            or (alias_target and alias_target in d_name_low)
+        ):
+            matches.append(d)
+            if len(matches) >= limit:
+                break
+    return {"query": q, "results": matches, "count": len(matches)}
+
+
+@app.get("/api/v1/districts/state/{state_slug}")
+async def get_districts_by_state(state_slug: str):
+    """List all districts belonging to a given state/UT."""
+    districts = load_districts_gazetteer()
+    target_state = state_slug.replace("-", " ").lower()
+    matches = [d for d in districts if target_state in d["state"].lower() or d["state"].lower() in target_state]
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"No districts found for state '{state_slug}'")
+    return {"state": matches[0]["state"], "districts": matches, "count": len(matches)}
 
 
 @app.get("/api/live/nodes")

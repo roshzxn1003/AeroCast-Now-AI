@@ -12,6 +12,8 @@ import {
   StormCell,
   SoundingParameters,
   GridPoint,
+  DistrictNowcastResponse,
+  DistrictSummaryResponse,
 } from '../types/nowcast';
 
 const API_BASE = '/api';
@@ -128,6 +130,45 @@ export async function fetchLightningJumpTimeseries(hasJump: boolean = true): Pro
     return await res.json();
   } catch {
     return generateFallbackLightningData(hasJump);
+  }
+}
+
+export async function fetchDistrictNowcast(
+  districtQuery: string,
+  stormMode: string = 'Severe Squall Line',
+  dataMode: string = 'auto'
+): Promise<DistrictNowcastResponse | null> {
+  try {
+    const params = new URLSearchParams({ storm_mode: stormMode, data_mode: dataMode });
+    const res = await fetch(`${API_BASE}/v1/districts/nowcast/${encodeURIComponent(districtQuery)}?${params.toString()}`);
+    if (!res.ok) throw new Error(`District nowcast failed: ${res.statusText}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`District nowcast fetch error for ${districtQuery}:`, err);
+    return null;
+  }
+}
+
+export async function fetchDistrictsSummary(limit: number = 50): Promise<DistrictSummaryResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/districts/summary?limit=${limit}`);
+    if (!res.ok) throw new Error(`Districts summary failed: ${res.statusText}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('Districts summary fetch error:', err);
+    return null;
+  }
+}
+
+export async function searchDistrictsApi(query: string, limit: number = 15): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/districts/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+    if (!res.ok) throw new Error(`District search failed: ${res.statusText}`);
+    const data = await res.json();
+    return data.results || [];
+  } catch (err) {
+    console.warn(`District search error for ${query}:`, err);
+    return [];
   }
 }
 

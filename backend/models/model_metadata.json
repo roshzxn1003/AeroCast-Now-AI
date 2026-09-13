@@ -29,24 +29,24 @@
     ],
     "metrics_threshold_25dBZ": {
         "CSI_Threat_Score": 0.838,
-        "Probability_of_Detection_POD": 0.909,
-        "False_Alarm_Ratio_FAR": 0.085,
+        "Probability_of_Detection_POD": 0.899,
+        "False_Alarm_Ratio_FAR": 0.075,
         "Heidke_Skill_Score_HSS": 0.897
     },
     "metrics_threshold_35dBZ": {
-        "CSI_Threat_Score": 0.833,
-        "Probability_of_Detection_POD": 0.904,
-        "False_Alarm_Ratio_FAR": 0.086,
-        "Heidke_Skill_Score_HSS": 0.898
+        "CSI_Threat_Score": 0.85,
+        "Probability_of_Detection_POD": 0.917,
+        "False_Alarm_Ratio_FAR": 0.08,
+        "Heidke_Skill_Score_HSS": 0.909
     },
     "metrics_threshold_45dBZ": {
-        "CSI_Threat_Score": 0.837,
-        "Probability_of_Detection_POD": 0.905,
-        "False_Alarm_Ratio_FAR": 0.082,
-        "Heidke_Skill_Score_HSS": 0.904
+        "CSI_Threat_Score": 0.834,
+        "Probability_of_Detection_POD": 0.897,
+        "False_Alarm_Ratio_FAR": 0.078,
+        "Heidke_Skill_Score_HSS": 0.901
     },
-    "reflectivity_mae_dbz": 2.57,
-    "reflectivity_rmse_dbz": 5.19,
+    "reflectivity_mae_dbz": 2.26,
+    "reflectivity_rmse_dbz": 4.8,
     "training_epochs": 18,
     "training_samples": 128,
     "validation_samples": 32

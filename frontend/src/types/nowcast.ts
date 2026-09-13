@@ -299,3 +299,113 @@ export interface NetworkStatus {
   domain: { lat_min: number; lat_max: number; lon_min: number; lon_max: number };
   providers: ProviderStatus[];
 }
+
+export interface DistrictNowcastTimelineStep {
+  lead_time_min: number;
+  forecast_time: string;
+  threat_level: string;
+  threat_color: string;
+  reflectivity_dbz: number;
+  vil_kg_m2: number;
+  cloud_top_temp_c: number;
+  rain_intensity_mm_h: number;
+  wind_gust_kmh: number;
+  hail_probability_pct: number;
+}
+
+export interface DistrictNowcastResponse {
+  district: {
+    id: string;
+    name: string;
+    state: string;
+    lat: number;
+    lon: number;
+    bbox: [number, number, number, number];
+  };
+  observation_station: {
+    station_name: string;
+    radar_type: string;
+    distance_to_station_km: number;
+    within_radar_sweep: boolean;
+    data_provenance: string;
+  };
+  current_observation: {
+    threat_level: string;
+    threat_color: string;
+    reflectivity_dbz: number;
+    vil_kg_m2: number;
+    cloud_top_temp_c: number;
+    flash_rate_fpm: number;
+    nearest_storm_core?: {
+      cell_id: string;
+      severity: string;
+      max_dbz: number;
+      distance_km: number;
+      speed_kmh: number;
+      heading_deg: number;
+      eta_minutes: number;
+    };
+  };
+  sounding_indices: SoundingParameters;
+  lightning_jump_alert: {
+    jump_detected: boolean;
+    lead_time_minutes: number;
+    current_rate_fpm: number;
+    rate_of_increase_sigma: number;
+    severity: string;
+  };
+  sector_impacts: {
+    rain_intensity_mm_h: number;
+    hail_probability_pct: number;
+    estimated_wind_gust_kmh: number;
+    aviation: {
+      runway_microburst_risk: string;
+      llws_alert: boolean;
+      flight_level_icing: boolean;
+    };
+    power_grid: {
+      substation_strike_risk: string;
+      line_trip_probability_pct: number;
+    };
+    agriculture: {
+      crop_hail_damage_risk: string;
+      open_field_lightning_danger: boolean;
+    };
+    urban: {
+      waterlogging_risk: string;
+      flash_flood_advisory: boolean;
+    };
+  };
+  nowcast_timeline: DistrictNowcastTimelineStep[];
+  cap_v1_2_bulletin: CAPBulletin;
+  advisory: {
+    en: string;
+    hi: string;
+  };
+  generated_at: string;
+}
+
+export interface DistrictSummaryItem {
+  id: string;
+  name: string;
+  state: string;
+  threat_level: string;
+  threat_color: string;
+  max_reflectivity_dbz: number;
+  cape_j_kg: number;
+  lat: number;
+  lon: number;
+}
+
+export interface DistrictSummaryResponse {
+  timestamp: string;
+  total_districts_indexed: number;
+  districts_monitored: number;
+  warning_summary: {
+    extreme_warnings: number;
+    severe_warnings: number;
+    moderate_watches: number;
+  };
+  districts: DistrictSummaryItem[];
+}
+

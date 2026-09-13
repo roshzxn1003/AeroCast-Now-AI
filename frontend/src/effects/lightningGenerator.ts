@@ -29,8 +29,16 @@ export class ProceduralLightningManager {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    // Transient point light for realistic atmospheric cloud & ground illumination
-    this.flashLight = new THREE.PointLight(0x7dd3fc, 0, 80, 1.8);
+    // Transient point light for realistic atmospheric cloud & ground illumination.
+    //
+    // Range matters more than it looks: the globe has radius 100, so the
+    // previous 80-unit distance lit a cap roughly 45 degrees wide and every
+    // flash whited out the whole visible hemisphere, hiding the map for about
+    // a second. 30 units still reads as a large, dramatic flash -- real
+    // lightning lights cloud over ~100 km, which would be under two units
+    // here -- while keeping the illumination local to the storm rather than
+    // whiting out the whole hemisphere.
+    this.flashLight = new THREE.PointLight(0x7dd3fc, 0, 48, 1.8);
     this.scene.add(this.flashLight);
   }
 

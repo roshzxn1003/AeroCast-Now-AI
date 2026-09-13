@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNowcastStore } from '../store/nowcastStore';
-import { fetchLightningJumpTimeseries } from '../services/api';
-import { FlashTimeSeriesPoint } from '../types/nowcast';
+import { fetchLightningJumpTimeseries, fetchDistrictsSummary } from '../services/api';
+import { FlashTimeSeriesPoint, DistrictSummaryResponse } from '../types/nowcast';
 import {
   Zap,
   Clock,
@@ -12,6 +12,9 @@ import {
   Check,
   Info,
   ShieldCheck,
+  MapPin,
+  Radar,
+  Radio,
 } from 'lucide-react';
 import {
   LineChart,
@@ -29,12 +32,22 @@ export const AlertsScreen: React.FC = () => {
   const [timeseries, setTimeseries] = useState<FlashTimeSeriesPoint[]>([]);
   const [copied, setCopied] = useState(false);
   const [showJson, setShowJson] = useState(false);
+  const [districtSummary, setDistrictSummary] = useState<DistrictSummaryResponse | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   useEffect(() => {
     fetchLightningJumpTimeseries(hasJump).then((res) => {
       setTimeseries(res.timeseries);
     });
   }, [hasJump]);
+
+  useEffect(() => {
+    setLoadingSummary(true);
+    fetchDistrictsSummary(12).then((res) => {
+      if (res) setDistrictSummary(res);
+      setLoadingSummary(false);
+    });
+  }, []);
 
   if (!nowcastData) return null;
 
@@ -312,6 +325,85 @@ export const AlertsScreen: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* National District Convective Watch Grid */}
+      <div className="bg-[var(--color-surface-base)] border border-[var(--color-line)] rounded-[10px] p-4 space-y-3 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--color-line)] pb-3">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-rose-400 animate-pulse" />
+            <div>
+              <h3 className="font-bold text-xs lg:text-sm text-[var(--color-ink)] flex items-center gap-2">
+                National District Convective Hazard Watch
+                <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                  {districtSummary
+                    ? `${(districtSummary.warning_summary.extreme_warnings || 0) + (districtSummary.warning_summary.severe_warnings || 0)} Active Warnings`
+                    : 'Scanning 734 Districts...'}
+                </span>
+              </h3>
+              <p className="text-[11px] text-[var(--color-ink-muted)]">
+                AI nowcasting model sweep across all 734 Indian districts via IMD Doppler Radar & INSAT-3D
+              </p>
+            </div>
+          </div>
+          <div className="text-[11px] text-[var(--color-ink-muted)] font-mono flex items-center gap-2">
+            <span>{districtSummary?.total_districts_indexed ?? 734} Districts Monitored</span>
+          </div>
+        </div>
+
+        {loadingSummary && (
+          <div className="py-8 text-center text-xs text-[var(--color-ink-muted)] animate-pulse">
+            Querying deep learning extrapolation across national district grid...
+          </div>
+        )}
+
+        {districtSummary && districtSummary.districts && districtSummary.districts.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+            {districtSummary.districts.map((d: any) => (
+              <div
+                key={d.id}
+                className="bg-black/30 border border-[var(--color-line-faint)] hover:border-amber-500/40 rounded-lg p-3 space-y-2 transition-all"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-bold text-xs text-[var(--color-ink)] flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span>{d.name}</span>
+                    </div>
+                    <div className="text-[10px] text-[var(--color-ink-muted)] pl-5">{d.state}</div>
+                  </div>
+                  <span
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                      d.threat_level === 'EXTREME'
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                        : d.threat_level === 'SEVERE'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+                    }`}
+                  >
+                    {d.threat_level}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 pt-1 text-[10px] font-mono">
+                  <div className="bg-black/40 p-1.5 rounded border border-white/5">
+                    <div className="text-[9px] text-[var(--color-ink-muted)] uppercase">Peak Reflectivity</div>
+                    <div className="font-bold text-amber-300">{d.max_reflectivity_dbz} dBZ</div>
+                  </div>
+                  <div className="bg-black/40 p-1.5 rounded border border-white/5">
+                    <div className="text-[9px] text-[var(--color-ink-muted)] uppercase">CAPE Sounding</div>
+                    <div className="font-bold text-cyan-300">{Math.round(d.cape_j_kg)} J/kg</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-[var(--color-ink-muted)] pt-1 border-t border-white/5 font-mono">
+                  <span>Lat: {Number(d.lat).toFixed(2)}°, Lon: {Number(d.lon).toFixed(2)}°</span>
+                  <span className="text-amber-400 font-medium">Auto-Nowcast</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

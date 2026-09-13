@@ -8,6 +8,7 @@ import { ACCENT, FLASH, severityColor, SURFACE } from '../design/tokens';
 import { ProceduralLightningManager } from '../effects/lightningGenerator';
 import { thunderAudio } from '../effects/thunderAudio';
 import { MAJOR_INDIAN_CITIES, CityPreset } from '../utils/weatherInterpreter';
+import { DistrictOverlay } from './DistrictOverlay';
 import { Volume2, VolumeX, Sun, Moon, ZoomIn, ZoomOut, Compass, Navigation } from 'lucide-react';
 
 /**
@@ -23,6 +24,8 @@ import { Volume2, VolumeX, Sun, Moon, ZoomIn, ZoomOut, Compass, Navigation } fro
  * - Web Audio API spatial rolling thunder audio with on-screen mute control
  * - Indian city beacons with weather status badges & 1-click smooth camera flight
  * - Floating glassmorphic HUD for regional navigation & camera presets
+ * - All 734 India districts: boundaries, live convective choropleth, search
+ *   and per-district readout (see DistrictOverlay / globe/districtLayer)
  */
 
 const HOME_CENTRE = { lat: 21.0, lng: 80.0 };
@@ -56,6 +59,17 @@ const REGIONAL_PRESETS = [
   { id: 'west', label: 'West (Mumbai/Guj)', lat: 19.5, lng: 73.5, altitude: 0.38 },
   { id: 'east', label: 'East (Kolkata/NE)', lat: 23.0, lng: 88.0, altitude: 0.38 },
 ];
+
+/**
+ * Cloud-deck fade window, in camera altitude.
+ *
+ * The deck is a 1024px whole-Earth texture floating above the surface. Far out
+ * it reads as weather; close in it is a blur sitting on top of the tile
+ * basemap, hiding exactly the detail the tiles are there to show. So it fades
+ * out over this range and is gone by the time street-level imagery is legible.
+ */
+const CLOUD_FADE_START = 0.9;
+const CLOUD_FADE_END = 0.22;
 
 const RIPPLE_STRIKE_COUNT = 30;
 const RIPPLE_MAX_AGE_S = 90;
@@ -129,6 +143,22 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       .atmosphereAltitude(0.18)
       .showGraticules(false);
 
+    const controls = globe.controls() as unknown as {
+      autoRotate: boolean;
+      autoRotateSpeed: number;
+      enableDamping: boolean;
+      dampingFactor: number;
+      minDistance: number;
+      maxDistance: number;
+      enableRotate: boolean;
+      enableZoom: boolean;
+      enablePan: boolean;
+      minPolarAngle: number;
+      maxPolarAngle: number;
+      rotateSpeed: number;
+      zoomSpeed: number;
+    };
+
     // Labels are only legible once the camera is close enough that the cities
     // are not crowded into a few pixels of each other.
     const LABEL_ALTITUDE = 1.4;
@@ -139,27 +169,70 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       labelsShown = show;
       el.classList.toggle('show-city-names', show);
     };
-    globe.onZoom((pov: { altitude: number }) => syncLabels(pov.altitude));
+    /**
+     * Scale the sounding columns and the drag speed to the camera altitude.
+     *
+     * Both are fixed fractions of the globe radius, which is right when the
+     * whole country is in frame and wrong once it is not: a column 11% of the
+     * Earth's radius tall becomes a skyscraper straddling the viewport at city
+     * zoom, and a drag that spins the planet at that altitude is unusable.
+     * Recomputed only when the altitude has moved enough to matter, because
+     * re-applying a globe.gl accessor rebuilds that layer.
+     */
+    let lastScaleBand = -1;
+    const syncScale = (altitude: number) => {
+      const scale = Math.min(1, Math.max(0.08, Math.sqrt(altitude / 1.2)));
+
+      // Drag speed. Deliberately well under 1: at the default the globe spins
+      // most of the way round in a single short drag, which reads as the map
+      // running away from the pointer rather than following it. Still scaled
+      // by altitude, so a close-in drag nudges rather than sweeps.
+      controls.rotateSpeed = Math.min(0.42, Math.max(0.07, 0.07 + altitude * 0.24));
+
+      const band = Math.round(scale * 12);
+      if (band === lastScaleBand) return;
+      lastScaleBand = band;
+
+      globe
+        .pointAltitude((d) => (0.008 + (d as ConvectiveNode).intensity * 0.11) * scale)
+        .pointRadius(
+          (d) =>
+            ((d as ConvectiveNode).thunderstorm_observed ? 0.22 : 0.13) *
+            (0.35 + 0.65 * scale),
+        );
+    };
+
+    globe.onZoom((pov: { altitude: number }) => {
+      syncLabels(pov.altitude);
+      syncScale(pov.altitude);
+    });
 
     const initialPov = homePov(el);
     globe.pointOfView(initialPov, 0);
     syncLabels(initialPov.altitude);
+    syncScale(initialPov.altitude);
 
-    // Deep camera controls: minDistance set to 101.5 to unlock deep zoom into India!
-    const controls = globe.controls() as {
-      autoRotate: boolean;
-      autoRotateSpeed: number;
-      enableDamping: boolean;
-      dampingFactor: number;
-      minDistance: number;
-      maxDistance: number;
-    };
     controls.autoRotate = false;
     controls.autoRotateSpeed = 0.16;
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
+    // Higher than the previous 0.08: that let the globe coast for a long time
+    // after the pointer stopped, so it kept drifting past the intended target.
+    controls.dampingFactor = 0.16;
+    // Finer wheel steps -- one notch used to cross several zoom levels.
+    controls.zoomSpeed = 0.55;
     controls.minDistance = 101.5; // Surface is radius 100 — allows ultra-close city zoom!
     controls.maxDistance = 650;
+
+    // Unrestricted orbit: the camera may travel over either pole and all the
+    // way around, so any point on Earth can be brought into view by dragging
+    // alone. OrbitControls clamps nothing here, and panning stays off because
+    // moving the orbit target off the planet's centre is what makes a globe
+    // feel broken rather than free.
+    controls.enableRotate = true;
+    controls.enableZoom = true;
+    controls.enablePan = false;
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI;
 
     // A globe is a smooth, mostly-curved subject: rendering beyond ~1.5x adds
     // cost without visible benefit, and the transparent layers make every extra
@@ -184,9 +257,21 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     // -------------------------------------------------------------------------
     // 3. Rotating 3D Cloud Sphere
     // -------------------------------------------------------------------------
+    // Guards the async texture load against a superseded run of this effect.
+    // Under StrictMode the effect mounts twice, and without this the first
+    // run's callback lands after the second globe exists and overwrites
+    // cloudsMeshRef with a mesh belonging to the destroyed globe. The live
+    // deck is then orphaned: never rotated, never faded, permanently opaque.
+    let cancelled = false;
+
     new THREE.TextureLoader().load(
       '/textures/clouds.png',
       (cloudsTexture) => {
+        if (cancelled) {
+          cloudsTexture.dispose();
+          return;
+        }
+
         cloudsTexture.wrapS = THREE.RepeatWrapping;
         cloudsTexture.wrapT = THREE.ClampToEdgeWrapping;
 
@@ -211,9 +296,20 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     // -------------------------------------------------------------------------
     // 4. Animation Loop for Lightning Flickers & Cloud Rotation
     // -------------------------------------------------------------------------
+    const baseCloudOpacity = earthTheme === 'night' ? 0.45 : 0.72;
+
     const animate = () => {
-      if (cloudsMeshRef.current) {
-        cloudsMeshRef.current.rotation.y += 0.00018; // Slow atmospheric cloud drift
+      const clouds = cloudsMeshRef.current;
+      if (clouds) {
+        clouds.rotation.y += 0.00018; // Slow atmospheric cloud drift
+
+        const { altitude } = globe.pointOfView();
+        const t = Math.max(
+          0,
+          Math.min(1, (altitude - CLOUD_FADE_END) / (CLOUD_FADE_START - CLOUD_FADE_END)),
+        );
+        (clouds.material as THREE.MeshPhongMaterial).opacity = baseCloudOpacity * t;
+        clouds.visible = t > 0.01;
       }
       lightningManagerRef.current?.update();
       animFrameRef.current = requestAnimationFrame(animate);
@@ -294,6 +390,8 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     observer.observe(el);
 
     return () => {
+      cancelled = true;
+      cloudsMeshRef.current = null;
       observer.disconnect();
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       lightningManager.dispose();
@@ -317,15 +415,21 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     if (!globe || !lightningManager || !ready || strikes.length === 0) return;
 
     // Trigger visual 3D bolts for newest strikes (< 45s old)
-    const freshStrikes = strikes.filter((s) => s.age_s <= 45).slice(0, 6);
+    const freshStrikes = strikes.filter((s) => s.age_s <= 45).slice(0, 12);
 
     freshStrikes.forEach((strike, idx) => {
       const start = globe.getCoords(strike.lat, strike.lon, 0.045); // Cloud deck height
+      // Ground or secondary cloud coordinate.
+      //
+      // The cloud-to-ground terminus sits at 0.005, not at the surface: the
+      // tile basemap occupies up to ~0.0030, so a bolt ending at 0.001 had its
+      // final segment and its entire ground-impact flash buried under the map.
+      // This keeps the strike point visibly on top of the terrain.
       const end = globe.getCoords(
         strike.lat + (strike.type === 'IC' ? 0.25 : 0),
         strike.lon + (strike.type === 'IC' ? 0.25 : 0),
-        strike.type === 'IC' ? 0.035 : 0.001
-      ); // Ground or secondary cloud coordinate
+        strike.type === 'IC' ? 0.038 : 0.005
+      );
 
       if (start && end) {
         const startVec = new THREE.Vector3(start.x, start.y, start.z);
@@ -510,6 +614,14 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         style={{ background: SURFACE.void, cursor: 'grab' }}
         role="img"
         aria-label="Interactive 3D Convective Earth Globe with Procedural Lightning"
+      />
+
+      {/* District layer. Owns its own meshes, labels and pointer handling, and
+          deliberately uses none of globe.gl's layer accessors — those are all
+          claimed above and are setters, not subscriptions. */}
+      <DistrictOverlay
+        globe={ready ? globeRef.current : null}
+        container={containerRef.current}
       />
 
       {/* Hovered Sounding Node Tooltip (Positioned beside top-left Strike HUD without overlap) */}

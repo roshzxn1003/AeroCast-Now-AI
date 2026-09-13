@@ -1,0 +1,581 @@
+/* =============================================================================
+   District layer
+
+   These panels float over live satellite imagery rather than over a flat app
+   background, which changes what "flat surface, hairline border" has to mean.
+   A solid slab punches a hole in the map; a translucent one with a blur reads
+   as an instrument laid on top of it and keeps the ground legible underneath.
+   So the surface ramp from index.css is kept, but carried at ~88% with a
+   backdrop blur, and every panel gets a hairline top highlight so it still has
+   an edge against bright terrain.
+
+   Colour continues to mean exactly one thing: meteorological intensity.
+   ========================================================================== */
+
+:root {
+  --dl-surface: rgba(11, 15, 20, 0.88);
+  --dl-surface-raised: rgba(24, 32, 42, 0.92);
+  --dl-hairline: rgba(255, 255, 255, 0.11);
+  --dl-hairline-strong: rgba(255, 255, 255, 0.18);
+  --dl-blur: saturate(140%) blur(14px);
+  --dl-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.district-panel,
+.district-search,
+.district-results,
+.district-hover,
+.district-legend {
+  background: var(--dl-surface);
+  border: 1px solid var(--dl-hairline);
+  -webkit-backdrop-filter: var(--dl-blur);
+  backdrop-filter: var(--dl-blur);
+  box-shadow: var(--dl-shadow);
+}
+
+/* -- Search ---------------------------------------------------------------- */
+
+.district-search-dock {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  width: clamp(15rem, 32vw, 24rem);
+  max-width: calc(100% - 1.5rem);
+}
+
+.district-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+}
+
+.district-search:focus-within {
+  border-color: var(--color-accent-line);
+  box-shadow: var(--dl-shadow), 0 0 0 3px rgba(76, 194, 255, 0.12);
+}
+
+.district-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+.district-search input::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.district-search input:disabled {
+  cursor: not-allowed;
+}
+
+.district-search__kbd {
+  flex-shrink: 0;
+  padding: 0.0625rem 0.3125rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--color-ink-faint);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.district-search__clear {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--color-ink-faint);
+  border-radius: var(--radius-sm);
+}
+
+.district-search__clear:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-overlay);
+}
+
+/* -- Results --------------------------------------------------------------- */
+
+.district-results {
+  margin-top: 0.4375rem;
+  max-height: 21rem;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  animation: sweep-in 0.16s ease-out both;
+}
+
+.district-results__empty {
+  padding: 0.75rem 0.75rem;
+  font-size: var(--text-body);
+  color: var(--color-ink-faint);
+}
+
+.district-result {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4375rem 0.625rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-line-faint);
+}
+
+.district-results li:last-child .district-result {
+  border-bottom: 0;
+}
+
+.district-result.is-active {
+  background: rgba(76, 194, 255, 0.1);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.district-result__label {
+  flex-shrink: 0;
+  font-size: var(--text-body);
+  color: var(--color-ink);
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.district-result__detail {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-micro);
+  color: var(--color-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.district-result__kind {
+  flex-shrink: 0;
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+.district-result.is-active .district-result__kind {
+  color: var(--color-accent);
+}
+
+/* -- Hover strip -----------------------------------------------------------
+   Fixed to the bottom-centre rather than tracking the cursor: a chip that
+   follows the pointer over a globe the user is also dragging reads as jitter,
+   and this never covers what is being pointed at.                         */
+
+.district-hover {
+  position: absolute;
+  bottom: 3.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  pointer-events: none;
+  white-space: nowrap;
+  border-radius: 999px;
+}
+
+.district-hover__name {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.district-hover__state,
+.district-hover__sev {
+  font-size: var(--text-micro);
+  color: var(--color-ink-faint);
+}
+
+.district-hover__sev {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+/* -- Detail panel ---------------------------------------------------------- */
+
+.district-panel-dock {
+  position: absolute;
+  top: 3.5rem;
+  right: 0.75rem;
+  z-index: 26;
+  width: 19rem;
+  /* Clears the bottom-right camera controls. */
+  max-height: calc(100% - 12rem);
+  overflow-y: auto;
+  animation: sweep-in 0.2s ease-out both;
+}
+
+.district-panel {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.district-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--color-line-faint);
+}
+
+.district-panel__title {
+  margin-top: 0.125rem;
+  font-size: var(--text-lead);
+  font-weight: 600;
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+
+.district-panel__sub {
+  font-size: var(--text-micro);
+  color: var(--color-ink-muted);
+}
+
+.district-panel__icon {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--color-ink-faint);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.district-panel__icon:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-overlay);
+}
+
+.district-panel__error {
+  padding: 0.75rem;
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  color: var(--color-sev-severe);
+}
+
+.district-panel__threat {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+}
+
+.district-panel__bar {
+  height: 3px;
+  margin: 0 0.75rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+}
+
+.district-panel__bar > div {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.district-panel__conditions {
+  padding: 0.5rem 0.75rem 0.75rem;
+  font-size: var(--text-body);
+  color: var(--color-ink-muted);
+}
+
+.district-panel__note {
+  margin-top: 0.5rem;
+  font-size: var(--text-micro);
+  line-height: 1.45;
+  color: var(--color-ink-faint);
+}
+
+.district-panel__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--color-ink-faint);
+  border-top: 1px solid var(--color-line-faint);
+}
+
+/* -- Panel sections -------------------------------------------------------- */
+
+.district-section {
+  padding: 0.625rem 0.75rem;
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.district-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.district-section__prov {
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  color: var(--color-ink-faint);
+}
+
+.district-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem 0.75rem;
+}
+
+.district-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--color-line-faint);
+}
+
+.district-row:last-child {
+  border-bottom: 0;
+}
+
+.district-row__label {
+  font-size: var(--text-label);
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.district-row__note {
+  margin-top: 0.0625rem;
+  font-size: var(--text-micro);
+  line-height: 1.4;
+  color: var(--color-ink-faint);
+}
+
+.district-row__value {
+  flex-shrink: 0;
+  font-size: var(--text-label);
+  color: var(--color-ink);
+}
+
+/* -- Legend ----------------------------------------------------------------
+   Raised clear of the globe's own bottom-centre region-nav row.            */
+
+.district-legend {
+  position: absolute;
+  bottom: 3.25rem;
+  left: 0.75rem;
+  z-index: 24;
+  width: 13.5rem;
+  padding: 0.625rem 0.75rem 0.5rem;
+  border-radius: var(--radius-lg);
+}
+
+.district-legend__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.district-legend__title {
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+/* A continuous ramp rather than five separate swatches: threat is a scale,
+   and five labelled chips invited reading it as five unrelated states. */
+.district-legend__scale {
+  display: flex;
+  height: 0.375rem;
+  margin-top: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.district-legend__scale span {
+  flex: 1;
+}
+
+.district-legend__ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+}
+
+.district-legend__note {
+  margin-top: 0.4375rem;
+  padding-top: 0.4375rem;
+  border-top: 1px solid var(--color-line-faint);
+  font-size: var(--text-micro);
+  color: var(--color-ink-muted);
+}
+
+/* Provider attribution is a licence condition for the basemap tiles, so it is
+   always rendered whenever tiles are configured - never conditionally hidden.
+   Clipped to one line, with the full text in the title attribute. */
+.district-legend__credit {
+  margin-top: 0.1875rem;
+  overflow: hidden;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+
+/* -- 120-hour outlook ------------------------------------------------------
+   The strip is 120 hourly bars. At panel width that is under two pixels each,
+   which is the point: it is read as a shape - where the afternoon convective
+   spikes fall across five days - not as individual values. Exact figures are
+   in each bar's tooltip and in the day cells below.                       */
+
+.outlook-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 2.5rem;
+  padding: 0.25rem 0.375rem;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-sm);
+}
+
+.outlook-strip span {
+  flex: 1;
+  min-width: 0;
+  border-radius: 1px 1px 0 0;
+  opacity: 0.9;
+}
+
+.outlook-days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.outlook-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.0625rem;
+  padding: 0.3125rem 0.125rem;
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: var(--radius-sm);
+}
+
+.outlook-day__label {
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+.outlook-day__score {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.outlook-day__meta {
+  font-size: 0.5625rem;
+  color: var(--color-ink-faint);
+}
+
+/* -- Globe-space district labels -------------------------------------------
+   Positioned imperatively by districtLayer.ts from projected screen coords.  */
+
+.district-label-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.district-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.0625rem 0.3125rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: #e9eef4;
+  /* Imagery runs from near-black ocean to bright sand, so the chip carries its
+     own ground plus a soft halo -- neither a light nor a dark label alone
+     stays legible across that range. */
+  background: rgba(8, 12, 17, 0.62);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  border-radius: 3px;
+  will-change: transform;
+}
+
+/* -- Shared ---------------------------------------------------------------- */
+
+@keyframes district-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: district-spin 0.9s linear infinite;
+}
+
+/* -- Narrow viewports ------------------------------------------------------
+   The panel becomes a bottom sheet and the legend gives up its corner to it;
+   at this width the globe needs every pixel it can keep.                  */
+
+@media (max-width: 640px) {
+  .district-search-dock {
+    top: 0.5rem;
+    width: calc(100% - 1.5rem);
+  }
+
+  .district-panel-dock {
+    top: auto;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+    max-height: 58%;
+  }
+
+  .district-legend {
+    display: none;
+  }
+
+  .district-hover {
+    bottom: 0.75rem;
+  }
+
+  .district-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
