@@ -229,3 +229,16 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* -- Globe city labels -----------------------------------------------------
+   Names stay hidden until the camera is close enough for them not to overlap;
+   the marker dots remain visible at every zoom level.                      */
+.city-name {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.show-city-names .city-name {
+  opacity: 1;
+}

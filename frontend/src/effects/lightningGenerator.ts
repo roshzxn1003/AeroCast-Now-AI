@@ -57,7 +57,7 @@ export class ProceduralLightningManager {
     group.add(mainBranch.glow);
 
     // 2. Generate 1-3 secondary fork branches
-    const forkCount = type === 'CG' ? Math.floor(1 + Math.random() * 3) : Math.floor(2 + Math.random() * 3);
+    const forkCount = type === 'CG' ? 1 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2);
     const points = mainBranch.points;
 
     for (let i = 0; i < forkCount; i++) {

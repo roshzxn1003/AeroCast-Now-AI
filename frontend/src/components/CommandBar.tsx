@@ -1,10 +1,9 @@
 import React from 'react';
-import { Activity, AlertTriangle, RefreshCw, Zap, User, Gauge, MapPin } from 'lucide-react';
+import { RefreshCw, Zap, User, Gauge, MapPin } from 'lucide-react';
 import { useLiveStore } from '../store/liveStore';
 import { useNowcastStore } from '../store/nowcastStore';
-import { Badge, Button, ProvenanceBadge } from './ui';
+import { Button, ProvenanceBadge } from './ui';
 import { ActiveTab } from '../types/nowcast';
-import { severityColor } from '../design/tokens';
 import { MAJOR_INDIAN_CITIES } from '../utils/weatherInterpreter';
 
 const PRO_TABS: { id: ActiveTab; label: string }[] = [
@@ -107,33 +106,18 @@ export const CommandBar: React.FC = () => {
             </select>
           </div>
         ) : (
-          /* Pro Live Telemetry Strip */
+          /* Feed freshness only. Flash rate, storm counts and the most unstable
+             node all live in the rail; repeating them here was the main reason
+             the same figure appeared three times on one screen. */
           summary && (
-            <div className="hidden xl:flex items-center gap-5 pl-4 border-l border-[var(--color-line)]">
-              <Reading
-                icon={<Zap className="w-3.5 h-3.5" />}
-                label="Flash rate"
-                value={`${summary.flash_rate_per_min}/min`}
-                provenance={summary.lightning_status}
-              />
-              <Reading
-                icon={<AlertTriangle className="w-3.5 h-3.5" />}
-                label="Active storms"
-                value={`${summary.active_thunderstorms} of ${summary.nodes_monitored}`}
-                provenance={summary.convective_status}
-              />
-              {summary.most_unstable && (
-                <Reading
-                  icon={<Activity className="w-3.5 h-3.5" />}
-                  label="Most unstable"
-                  value={summary.most_unstable.name}
-                  badge={
-                    <Badge color={severityColor(summary.most_unstable.instability)}>
-                      {summary.most_unstable.instability}
-                    </Badge>
-                  }
-                />
-              )}
+            <div className="hidden xl:flex items-center gap-2 pl-4 border-l border-[var(--color-line)]">
+              <ProvenanceBadge provenance={summary.lightning_status} />
+              <span className="text-[11px] font-mono text-[var(--color-ink-faint)]">
+                {new Date(summary.retrieved_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
             </div>
           )
         )}
@@ -171,22 +155,3 @@ export const CommandBar: React.FC = () => {
   );
 };
 
-const Reading: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  provenance?: string;
-  badge?: React.ReactNode;
-}> = ({ icon, label, value, provenance, badge }) => (
-  <div className="flex items-center gap-2">
-    <span className="text-[var(--color-ink-faint)]">{icon}</span>
-    <div className="leading-tight">
-      <div className="eyebrow">{label}</div>
-      <div className="flex items-center gap-1.5 mt-0.5">
-        <span className="text-[12px] font-mono tabular text-[var(--color-ink)]">{value}</span>
-        {provenance && <ProvenanceBadge provenance={provenance} />}
-        {badge}
-      </div>
-    </div>
-  </div>
-);

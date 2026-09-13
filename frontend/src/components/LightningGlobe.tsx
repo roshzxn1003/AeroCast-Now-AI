@@ -25,7 +25,29 @@ import { Volume2, VolumeX, Sun, Moon, ZoomIn, ZoomOut, Compass, Navigation } fro
  * - Floating glassmorphic HUD for regional navigation & camera presets
  */
 
-const HOME_POV = { lat: 21.0, lng: 80.0, altitude: 1.15 };
+const HOME_CENTRE = { lat: 21.0, lng: 80.0 };
+
+/**
+ * Camera distance needed to frame India for a given viewport.
+ *
+ * globe.gl fits its field of view vertically, so a narrow portrait pane crops
+ * the country badly at the altitude that suits a wide desktop pane. Pulling the
+ * camera back on small and tall viewports keeps the whole domain visible.
+ */
+function homeAltitude(width: number, height: number): number {
+  if (width < 640) return 2.3;
+  if (height > width) return 1.8;
+  if (width < 1100) return 1.5;
+  return 1.15;
+}
+
+function homePov(el: HTMLElement | null) {
+  const rect = el?.getBoundingClientRect();
+  return {
+    ...HOME_CENTRE,
+    altitude: homeAltitude(rect?.width || window.innerWidth, rect?.height || window.innerHeight),
+  };
+}
 
 const REGIONAL_PRESETS = [
   { id: 'all', label: 'All India', lat: 21.0, lng: 80.0, altitude: 1.65 },
@@ -35,7 +57,7 @@ const REGIONAL_PRESETS = [
   { id: 'east', label: 'East (Kolkata/NE)', lat: 23.0, lng: 88.0, altitude: 0.38 },
 ];
 
-const RIPPLE_STRIKE_COUNT = 80;
+const RIPPLE_STRIKE_COUNT = 30;
 const RIPPLE_MAX_AGE_S = 90;
 
 interface LightningGlobeProps {
@@ -50,6 +72,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const globeRef = useRef<GlobeInstance | null>(null);
   const lightningManagerRef = useRef<ProceduralLightningManager | null>(null);
+  const stateBordersRef = useRef<THREE.LineSegments | null>(null);
   const cloudsMeshRef = useRef<THREE.Mesh | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
@@ -106,7 +129,21 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       .atmosphereAltitude(0.18)
       .showGraticules(false);
 
-    globe.pointOfView(HOME_POV, 0);
+    // Labels are only legible once the camera is close enough that the cities
+    // are not crowded into a few pixels of each other.
+    const LABEL_ALTITUDE = 1.4;
+    let labelsShown: boolean | null = null;
+    const syncLabels = (altitude: number) => {
+      const show = altitude < LABEL_ALTITUDE;
+      if (show === labelsShown) return;
+      labelsShown = show;
+      el.classList.toggle('show-city-names', show);
+    };
+    globe.onZoom((pov: { altitude: number }) => syncLabels(pov.altitude));
+
+    const initialPov = homePov(el);
+    globe.pointOfView(initialPov, 0);
+    syncLabels(initialPov.altitude);
 
     // Deep camera controls: minDistance set to 101.5 to unlock deep zoom into India!
     const controls = globe.controls() as {
@@ -131,6 +168,12 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 
     globeRef.current = globe;
+
+    // Development-only handle for render profiling (draw calls, triangle count,
+    // texture memory). Stripped from production builds.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __globe?: unknown }).__globe = globe;
+    }
 
     // -------------------------------------------------------------------------
     // 2. Procedural Lightning Engine Setup
@@ -184,25 +227,59 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       fetch('/geo/countries.geojson').then((r) => r.json()).catch(() => ({ features: [] })),
       fetch('/geo/indian_states.geojson').then((r) => r.json()).catch(() => ({ features: [] })),
     ]).then(([countries, indianStates]) => {
-      const combinedFeatures = [
-        ...countries.features.map((f: any) => ({ ...f, __layer: 'country' })),
-        ...(indianStates.features || []).map((f: any) => ({ ...f, __layer: 'state' })),
-      ];
+      // Only India is drawn as a polygon. The globe already carries a
+      // photographic Earth texture, so outlining all 177 countries added no
+      // information while costing a cap mesh, a side mesh and a stroke line
+      // each — by far the largest contributor to per-frame draw calls.
+      const indiaOutline = (countries.features || []).filter(
+        (f: any) => f?.properties?.name === 'India',
+      );
+      const combinedFeatures = indiaOutline.map((f: any) => ({ ...f, __layer: 'country' }));
+
+      // State boundaries are drawn as ONE merged line mesh rather than as 35
+      // polygon features. globe.gl builds a cap mesh and a stroke line per ring,
+      // and these 35 states carry 154 rings between them — roughly 300 extra
+      // draw calls every frame for what is visually a set of thin lines.
+      // Flattening them into a single LineSegments geometry costs exactly one.
+      const borderPositions: number[] = [];
+      const pushRing = (ring: number[][]) => {
+        for (let i = 0; i < ring.length - 1; i++) {
+          const a = globe.getCoords(ring[i][1], ring[i][0], 0.004);
+          const b = globe.getCoords(ring[i + 1][1], ring[i + 1][0], 0.004);
+          borderPositions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        }
+      };
+      (indianStates.features || []).forEach((f: any) => {
+        const geom = f.geometry;
+        if (!geom) return;
+        if (geom.type === 'Polygon') geom.coordinates.forEach(pushRing);
+        else if (geom.type === 'MultiPolygon')
+          geom.coordinates.forEach((poly: number[][][]) => poly.forEach(pushRing));
+      });
+
+      if (borderPositions.length) {
+        const borderGeo = new THREE.BufferGeometry();
+        borderGeo.setAttribute(
+          'position',
+          new THREE.Float32BufferAttribute(borderPositions, 3),
+        );
+        const borderMat = new THREE.LineBasicMaterial({
+          color: new THREE.Color('#38bdf8'),
+          transparent: true,
+          opacity: 0.38,
+          depthWrite: false,
+        });
+        const borderMesh = new THREE.LineSegments(borderGeo, borderMat);
+        stateBordersRef.current = borderMesh;
+        globe.scene().add(borderMesh);
+      }
 
       globe
         .polygonsData(combinedFeatures)
-        .polygonAltitude((f: any) => (f.__layer === 'state' ? 0.004 : 0.002))
-        .polygonCapColor((f: any) => {
-          if (f.__layer === 'state') return 'rgba(56, 189, 248, 0.04)';
-          const name = f?.properties?.name;
-          return name === 'India' ? 'rgba(56, 189, 248, 0.08)' : 'rgba(15, 23, 42, 0.05)';
-        })
+        .polygonAltitude(0.002)
+        .polygonCapColor(() => 'rgba(56, 189, 248, 0.08)')
         .polygonSideColor(() => 'rgba(0,0,0,0)')
-        .polygonStrokeColor((f: any) => {
-          if (f.__layer === 'state') return 'rgba(56, 189, 248, 0.35)';
-          const name = f?.properties?.name;
-          return name === 'India' ? 'rgba(56, 189, 248, 0.85)' : 'rgba(148, 163, 184, 0.20)';
-        });
+        .polygonStrokeColor(() => 'rgba(56, 189, 248, 0.85)');
 
       setReady(true);
     });
@@ -220,6 +297,11 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       observer.disconnect();
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       lightningManager.dispose();
+      if (stateBordersRef.current) {
+        stateBordersRef.current.geometry.dispose();
+        (stateBordersRef.current.material as THREE.Material).dispose();
+        stateBordersRef.current = null;
+      }
       globe._destructor?.();
       globeRef.current = null;
     };
@@ -235,7 +317,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     if (!globe || !lightningManager || !ready || strikes.length === 0) return;
 
     // Trigger visual 3D bolts for newest strikes (< 45s old)
-    const freshStrikes = strikes.filter((s) => s.age_s <= 45).slice(0, 15);
+    const freshStrikes = strikes.filter((s) => s.age_s <= 45).slice(0, 6);
 
     freshStrikes.forEach((strike, idx) => {
       const start = globe.getCoords(strike.lat, strike.lon, 0.045); // Cloud deck height
@@ -360,7 +442,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
             <span class="animate-ping absolute inline-flex h-3.5 w-3.5 rounded-full bg-cyan-400 opacity-75"></span>
             <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500 border border-white"></span>
           </div>
-          <span class="absolute top-1/2 -translate-y-1/2 ${onLeft ? 'right-full mr-1.5' : 'left-full ml-1.5'} bg-slate-900/90 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/40 shadow-lg backdrop-blur-sm whitespace-nowrap">
+          <span class="city-name absolute top-1/2 -translate-y-1/2 ${onLeft ? 'right-full mr-1.5' : 'left-full ml-1.5'} bg-slate-900/90 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/40 shadow-lg backdrop-blur-sm whitespace-nowrap">
             ${city.name}
           </span>
         `;
@@ -401,7 +483,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   }, []);
 
   const resetView = useCallback(() => {
-    globeRef.current?.pointOfView(HOME_POV, 1000);
+    globeRef.current?.pointOfView(homePov(containerRef.current), 1000);
     setFocusedNode(null);
     setSelectedCityInfo(null);
   }, [setFocusedNode]);
@@ -417,7 +499,11 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   }, [soundEnabled, setSoundEnabled]);
 
   return (
-    <div className={className} style={{ position: 'relative' }}>
+    // Positioning comes from the caller's className. An inline position:relative
+    // here silently overrode the `absolute inset-0` it is given, so the root
+    // never matched its container and the canvas was sized against the wrong
+    // box — leaving the globe rendered partly outside the visible pane.
+    <div className={className}>
       <div
         ref={containerRef}
         className="absolute inset-0"
@@ -496,7 +582,9 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
           }`}
         >
           {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> : <VolumeX className="w-3.5 h-3.5" />}
-          <span>{soundEnabled ? 'THUNDER AUDIO: ON' : 'SOUND: MUTED'}</span>
+          <span className="hidden sm:inline">
+            {soundEnabled ? 'THUNDER AUDIO: ON' : 'SOUND: MUTED'}
+          </span>
         </button>
 
         <button
@@ -509,7 +597,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       </div>
 
       {/* Floating Bottom-Center Region Quick-Nav HUD */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-700/70 shadow-2xl backdrop-blur-md">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-700/70 shadow-2xl backdrop-blur-md max-w-[calc(100%-2rem)] overflow-x-auto scrollbar-none">
         <div className="flex items-center gap-1 px-1">
           <Navigation className="w-3.5 h-3.5 text-cyan-400" />
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">
@@ -520,7 +608,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
           <button
             key={preset.id}
             onClick={() => flyToRegion(preset)}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+            className="px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap shrink-0 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
           >
             {preset.label}
           </button>

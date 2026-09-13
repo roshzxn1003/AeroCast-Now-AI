@@ -1,4 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import {
+  Activity,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Info,
+  MapPin,
+  ShieldAlert,
+  Zap,
+} from 'lucide-react';
 import { LightningGlobe } from '../components/LightningGlobe';
 import { ModelReportPanel } from '../components/ModelReportPanel';
 import { LightningJumpBanner } from '../components/LightningJumpBanner';
@@ -15,21 +25,21 @@ import {
   assessThunderstormThreat,
   MAJOR_INDIAN_CITIES,
 } from '../utils/weatherInterpreter';
-import {
-  ShieldAlert,
-  ShieldCheck,
-  AlertTriangle,
-  Zap,
-  MapPin,
-  Clock,
-  Info,
-  CheckCircle2,
-  Radio,
-  Activity,
-  Layers,
-  Globe2,
-} from 'lucide-react';
 
+/**
+ * The command screen.
+ *
+ * One skeleton serves both audiences: a dominant globe, and a single rail
+ * beside it. Public and Pro differ only in what the rail contains — never in
+ * the layout itself. The previous build ran a second rail on the left in Pro
+ * mode, which squeezed the globe, clipped its own panels, and printed every
+ * headline figure two or three times in different places.
+ *
+ * The rule the layout now follows: one fact, one home.
+ *   - the globe shows the single hero number (flashes) and nothing else
+ *   - the rail holds every other reading, grouped under quiet dividers
+ *   - the header carries identity, mode, navigation and one freshness stamp
+ */
 export const CommandScreen: React.FC = () => {
   const startPolling = useLiveStore((s) => s.startPolling);
   const lightning = useLiveStore((s) => s.lightning);
@@ -45,12 +55,8 @@ export const CommandScreen: React.FC = () => {
     setActiveTab,
   } = useNowcastStore();
 
-  // Responsive sub-tab view for tablet/mobile in Pro Mode
-  const [mobileProView, setMobileProView] = useState<'globe' | 'soundings' | 'nowcast'>('globe');
-
   useEffect(() => startPolling(), [startPolling]);
 
-  // Evaluate plain-English threat
   const maxDbz = nowcastData?.observation?.max_dbz || 0;
   const activeCells = nowcastData?.observation?.storm_cells || [];
   const strikeCount30m = summary?.strike_count_30min || 0;
@@ -59,419 +65,368 @@ export const CommandScreen: React.FC = () => {
     hasJump,
     activeCells.length,
     maxDbz,
-    strikeCount30m
+    strikeCount30m,
   );
 
   const currentCity =
     MAJOR_INDIAN_CITIES.find((c) => c.id === selectedCity) || MAJOR_INDIAN_CITIES[0];
 
   return (
-    <div className="flex flex-col gap-3 p-3 xl:h-[calc(100dvh-3.5rem)] min-h-0">
-      {/* Mobile/Tablet Sub-Tab Navigation Bar for Pro Mode (Hidden on Desktop >= xl) */}
-      {uiMode === 'pro' && (
-        <div className="flex xl:hidden items-center justify-between bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 text-xs shrink-0">
-          <button
-            onClick={() => setMobileProView('soundings')}
-            className={`flex-1 py-1.5 px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-all ${
-              mobileProView === 'soundings'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Radio className="w-3.5 h-3.5" />
-            <span>Soundings</span>
-          </button>
-          <button
-            onClick={() => setMobileProView('globe')}
-            className={`flex-1 py-1.5 px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-all ${
-              mobileProView === 'globe'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Globe2 className="w-3.5 h-3.5" />
-            <span>3D Earth</span>
-          </button>
-          <button
-            onClick={() => setMobileProView('nowcast')}
-            className={`flex-1 py-1.5 px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-all ${
-              mobileProView === 'nowcast'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span>Nowcast</span>
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col xl:flex-row gap-3 p-3 xl:h-[calc(100dvh-3.5rem)] min-h-0">
+      {/* ---------------------------------------------------------------- Stage */}
+      <section className="relative w-full shrink-0 xl:flex-1 min-w-0 h-[52vh] xl:h-auto rounded-[12px] border border-[var(--color-line)] overflow-hidden bg-[var(--color-surface-void)]">
+        <LightningGlobe className="absolute inset-0" />
+        {summary && <HeroCount count={summary.strike_count_30min} status={lightning?.status} />}
+        <GlobeLegend />
+      </section>
 
-      {/* Main Multi-Column Viewport */}
-      <div className="flex flex-col xl:flex-row gap-3 flex-1 min-h-0">
-        {/* ========================================================================
-            LEFT COLUMN (PRO MODE ONLY): OBSERVATION & SOUNDINGS CONSOLE
-            ======================================================================== */}
-        {uiMode === 'pro' && (
-          <aside
-            className={`w-full xl:w-80 2xl:w-[350px] shrink-0 flex flex-col gap-3 min-h-0 overflow-y-auto pr-0.5 ${
-              mobileProView === 'soundings' ? 'flex' : 'hidden xl:flex'
-            }`}
-          >
-            <div className="flex items-center justify-between px-1 text-[11px] font-bold uppercase tracking-wider text-cyan-400">
-              <span className="flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5" />
-                Live Ingest & Soundings
-              </span>
-              <span className="text-[10px] font-mono text-slate-400">LEFT RAIL</span>
-            </div>
+      {/* ----------------------------------------------------------------- Rail */}
+      <aside className="w-full xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col gap-3 min-h-0 pb-20 xl:pb-0 xl:overflow-y-auto [&>*]:shrink-0">
+        {uiMode === 'citizen' ? (
+          <>
+            <ThreatHero threat={threat} />
+            <CityRadarCard
+              currentCity={currentCity}
+              selectedCity={selectedCity}
+              onSelectCity={(id) => {
+                setSelectedCity(id);
+                const c = MAJOR_INDIAN_CITIES.find((item) => item.id === id);
+                if (c) setSelectedStation(c.stationName);
+              }}
+              maxDbz={maxDbz}
+              hasJump={hasJump}
+            />
+            <SafetyCard actions={threat.safetyActions} />
+            <ExplainerCard />
+          </>
+        ) : (
+          <>
+            <RailSection label="Nowcast" />
+            <LightningJumpBanner />
+            <StormCellsCard cells={activeCells} onOpenTracker={() => setActiveTab('storms')} />
+            <ModelReportPanel />
+
+            <RailSection label="Observations" />
             <LiveDomainPanel />
             <NodeDetailPanel />
             <NetworkStatusPanel />
-          </aside>
+          </>
         )}
-
-        {/* ========================================================================
-            CENTER COLUMN: 3D EARTH GEOSPATIAL CANVAS & HUD
-            ======================================================================== */}
-        <div
-          className={`relative flex-1 min-w-0 rounded-[12px] border border-[var(--color-line)] overflow-hidden h-[58vh] xl:h-auto bg-[var(--color-surface-void)] shadow-inner ${
-            uiMode === 'pro' && mobileProView !== 'globe' ? 'hidden xl:block' : 'block'
-          }`}
-        >
-          <LightningGlobe className="absolute inset-0" />
-
-          {/* Clean Glassmorphic Top-Left Strike Counter HUD (Non-colliding) */}
-          {summary && (
-            <div className="absolute top-4 left-4 z-20 panel p-3 bg-slate-950/85 backdrop-blur-md border border-cyan-500/35 rounded-xl shadow-2xl pointer-events-none min-w-[185px]">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
-                    30m Strikes
-                  </span>
-                </div>
-                {lightning && <ProvenanceBadge provenance={lightning.status} />}
-              </div>
-
-              <div className="flex items-baseline gap-1.5 mt-1.5">
-                <div className="font-mono text-2xl font-bold leading-none text-cyan-400 tabular">
-                  {summary.strike_count_30min.toLocaleString()}
-                </div>
-                <span className="text-[10px] text-slate-400 font-mono">flashes</span>
-              </div>
-
-              <div className="mt-1.5 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/80 pt-1">
-                <span>Rate: {summary.flash_rate_per_min}/min</span>
-                <span>CAPE: {summary.max_cape_j_kg.toFixed(0)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Collapsible Map Legend */}
-          <GlobeLegend uiMode={uiMode} />
-        </div>
-
-        {/* ========================================================================
-            RIGHT COLUMN: CITIZEN GUIDE OR PRO AI NOWCASTING & STORM KINEMATICS
-            ======================================================================== */}
-        <aside
-          className={`w-full xl:w-[380px] 2xl:w-[420px] shrink-0 flex flex-col gap-3 min-h-0 pb-20 xl:pb-0 overflow-y-auto ${
-            uiMode === 'pro' && mobileProView !== 'nowcast' ? 'hidden xl:flex' : 'flex'
-          }`}
-        >
-          {uiMode === 'citizen' ? (
-            /* ================================================================
-               PUBLIC / CITIZEN MODE RAIL
-               ================================================================ */
-            <div className="space-y-3">
-              {/* 1. Big Friendly Threat Alert Hero */}
-              <div
-                className="p-4 rounded-xl border shadow-lg transition-all"
-                style={{
-                  backgroundColor: threat.bgRgba,
-                  borderColor: threat.colorHex,
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className="text-xs font-bold px-2.5 py-0.5 rounded-full text-white shadow-sm"
-                    style={{ backgroundColor: threat.colorHex }}
-                  >
-                    {threat.badgeText}
-                  </span>
-                  <span className="text-xs text-slate-300 font-mono flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                    Live 0–2h AI Nowcast
-                  </span>
-                </div>
-
-                <h3 className="text-base sm:text-lg font-bold text-white mt-2.5 leading-snug">
-                  {threat.headline}
-                </h3>
-                <p className="text-xs text-slate-200 mt-1 leading-relaxed">
-                  {threat.subhead}
-                </p>
-              </div>
-
-              {/* 2. City Weather & Radar Quick-Lookup */}
-              <div className="p-3.5 rounded-xl border border-slate-700/70 bg-slate-900/90 shadow-md">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-400 uppercase tracking-wider">
-                    <MapPin className="w-3.5 h-3.5" />
-                    Local City Radar
-                  </div>
-                  <select
-                    value={selectedCity}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setSelectedCity(id);
-                      const c = MAJOR_INDIAN_CITIES.find((item) => item.id === id);
-                      if (c) setSelectedStation(c.stationName);
-                    }}
-                    className="bg-slate-800 text-cyan-300 text-xs rounded-lg px-2 py-1 border border-slate-600 focus:outline-none cursor-pointer"
-                  >
-                    {MAJOR_INDIAN_CITIES.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between">
-                  <div>
-                    <div className="text-lg font-bold text-white">{currentCity.name}</div>
-                    <div className="text-xs text-slate-400">{currentCity.state}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1 justify-end">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Radar Online
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-400">
-                      Range: 250 km
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 pt-2.5 border-t border-slate-800 grid grid-cols-2 gap-2 text-center text-xs">
-                  <div className="p-2 rounded-lg bg-slate-800/60">
-                    <div className="text-slate-400 text-[10px] uppercase">Rain Intensity</div>
-                    <div className="font-bold text-white mt-0.5">
-                      {maxDbz >= 40 ? '🌧️ Heavy Downpour' : maxDbz >= 25 ? '🌦️ Moderate Rain' : '⛅ Passing Showers'}
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-slate-800/60">
-                    <div className="text-slate-400 text-[10px] uppercase">Lightning Danger</div>
-                    <div className="font-bold text-amber-400 mt-0.5">
-                      {hasJump ? '⚡ High Alert' : '🟢 Moderate / Normal'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Actionable Safety Checklist for Citizens */}
-              <div className="p-3.5 rounded-xl border border-slate-700/70 bg-slate-900/90 shadow-md">
-                <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider mb-2.5">
-                  <ShieldAlert className="w-4 h-4" />
-                  What Should You Do Now?
-                </div>
-                <ul className="space-y-2">
-                  {threat.safetyActions.map((action, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-start gap-2 text-xs text-slate-300 leading-relaxed"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                      <span>{action}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* 4. Plain English Explainer Box */}
-              <div className="p-3 rounded-xl border border-cyan-500/20 bg-cyan-950/20 text-xs text-slate-300 leading-relaxed">
-                <div className="flex items-center gap-1.5 font-bold text-cyan-300 mb-1">
-                  <Info className="w-3.5 h-3.5" />
-                  How AeroCast AI Works
-                </div>
-                AeroCast fuses 11 IMD Doppler radars, ISRO INSAT-3D satellites, and ground lightning sensors. The deep learning model predicts thunderstorm movement 15 to 120 minutes in advance.
-              </div>
-            </div>
-          ) : (
-            /* ================================================================
-               PRO / FORECASTER MODE RAIL: AI NOWCAST & STORM KINEMATICS
-               ================================================================ */
-            <>
-              <div className="flex items-center justify-between px-1 text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                <span className="flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" />
-                  AI Nowcast & Prediction
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">RIGHT RAIL</span>
-              </div>
-
-              {/* Precursor Surge Alert */}
-              <LightningJumpBanner />
-
-              {/* Neural Model Verification on Demand */}
-              <ModelReportPanel />
-
-              {/* SCIT Storm Cell Kinematics Summary Card */}
-              <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface-base)] p-3.5 space-y-2.5 shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200 uppercase tracking-wide">
-                    <Activity className="w-4 h-4 text-orange-400" />
-                    SCIT Storm Cells ({activeCells.length} Active)
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('storms')}
-                    className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 transition-colors"
-                  >
-                    <span>Full Kinematics</span>
-                    <span>→</span>
-                  </button>
-                </div>
-
-                {activeCells.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic py-2">
-                    No active convective cells meeting ≥ 40 dBZ / 24 km² tracking threshold.
-                  </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {activeCells.slice(0, 3).map((cell) => (
-                      <div
-                        key={cell.cell_id}
-                        className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg p-2 flex items-center justify-between text-xs transition-colors"
-                      >
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: cell.color }}
-                            />
-                            <span className="font-bold text-slate-200">{cell.cell_id}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">{cell.area_km2} km²</span>
-                          </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">{cell.severity}</div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="font-bold text-orange-400 font-mono">{cell.max_dbz} dBZ</div>
-                          <div className="text-[10px] text-red-400 font-semibold">Hail Risk {cell.hail_risk_pct}%</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </aside>
-      </div>
+      </aside>
     </div>
   );
 };
 
-const GlobeLegend: React.FC<{ uiMode: 'citizen' | 'pro' }> = ({ uiMode }) => {
-  const [isOpen, setIsOpen] = useState(false);
+// -----------------------------------------------------------------------------
+// Stage furniture
+// -----------------------------------------------------------------------------
+
+/**
+ * The one figure that should be readable across a room. Deliberately carries no
+ * secondary readings: rate and CAPE live in the rail, and repeating them here is
+ * what made the old header, HUD and rail disagree at a glance.
+ */
+const HeroCount: React.FC<{ count: number; status?: string }> = ({ count, status }) => (
+  <div className="absolute top-4 left-4 z-20 pointer-events-none">
+    <div className="flex items-center gap-2">
+      <Zap className="w-3.5 h-3.5 text-[var(--color-ink-faint)]" />
+      <span className="eyebrow">Flashes · last 30 min</span>
+    </div>
+    <div className="flex items-baseline gap-2 mt-1">
+      <span
+        className="font-mono tabular font-medium leading-none"
+        style={{ fontSize: 'var(--text-display)', color: FLASH.cg }}
+      >
+        {count.toLocaleString()}
+      </span>
+      {status && <ProvenanceBadge provenance={status} />}
+    </div>
+  </div>
+);
+
+/** Collapsed by default: a legend is reference material, not a permanent panel. */
+const GlobeLegend: React.FC = () => {
+  const [open, setOpen] = useState(false);
 
   return (
-    <div
-      className="absolute bottom-4 left-4 z-20 pointer-events-auto backdrop-blur-md rounded-xl transition-all shadow-xl hidden sm:block overflow-hidden"
-      style={{
-        background: 'rgba(11, 15, 20, 0.94)',
-        border: '1px solid rgba(56, 189, 248, 0.3)',
-      }}
-    >
+    <div className="absolute bottom-3 left-3 z-20 hidden sm:block">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between gap-3 px-3 py-1.5 w-full text-left hover:bg-white/5 transition-colors cursor-pointer"
-        title="Toggle map legend display"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] border border-[var(--color-line)] bg-[rgba(11,15,20,0.92)] text-[11px] font-mono text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
       >
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-cyan-400 uppercase tracking-wide">
-          <Layers className="w-3 h-3" />
-          <span>Map Legend</span>
-        </div>
-        <span className="text-[10px] font-mono text-slate-400">
-          {isOpen ? '▾ Hide' : '▸ Show'}
-        </span>
+        Legend
+        <ChevronDown
+          className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
 
-      {isOpen && (
-        <div className="p-3 pt-2 space-y-2 border-t border-slate-800/80">
-          {uiMode === 'citizen' ? (
-            <>
-              <div className="space-y-1.5 text-[10px] text-slate-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="relative flex items-center justify-center w-3">
-                    <span className="absolute w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-                    <span className="relative w-2 h-2 rounded-full bg-cyan-400" />
-                  </span>
-                  City Beacon — tap to dive in
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="flex rounded-full overflow-hidden h-2 w-10">
-                    {SEVERITY_LEVELS.map((level) => (
-                      <span
-                        key={level}
-                        className="flex-1"
-                        style={{ background: SEVERITY_COLOR[level] }}
-                      />
-                    ))}
-                  </span>
-                  Storm energy — calm to severe
-                </span>
-                <span className="flex items-center gap-3">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: FLASH.cg }} />
-                    Ground strike
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: FLASH.ic }} />
-                    In-cloud
-                  </span>
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 max-w-[15rem] leading-snug">
-                Drag to rotate. Scroll to zoom directly into Indian states & radar sites.
-              </p>
-            </>
-          ) : (
-            <>
-              <div>
-                <div className="eyebrow mb-1">Convective Instability</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex rounded-full overflow-hidden h-1.5 w-24">
-                    {SEVERITY_LEVELS.map((level) => (
-                      <span
-                        key={level}
-                        className="flex-1"
-                        style={{ background: SEVERITY_COLOR[level] }}
-                        title={level}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400">Stable → Extreme</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="eyebrow mb-1">Lightning Geolocation</div>
-                <div className="flex items-center gap-3 text-[10px] font-mono text-slate-300">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: FLASH.cg }} />
-                    CG (Ground)
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: FLASH.ic }} />
-                    IC (Cloud)
-                  </span>
-                </div>
-              </div>
-            </>
-          )}
+      {open && (
+        <div
+          className="mt-1.5 panel px-3 py-2.5 space-y-2 enter"
+          style={{ background: 'rgba(11,15,20,0.94)' }}
+        >
+          <LegendRow label="Storm energy">
+            <span className="flex rounded-full overflow-hidden h-2 w-16">
+              {SEVERITY_LEVELS.map((level) => (
+                <span key={level} className="flex-1" style={{ background: SEVERITY_COLOR[level] }} />
+              ))}
+            </span>
+          </LegendRow>
+          <LegendRow label="Ground strike">
+            <span className="w-2 h-2 rounded-full" style={{ background: FLASH.cg }} />
+          </LegendRow>
+          <LegendRow label="In-cloud">
+            <span className="w-2 h-2 rounded-full" style={{ background: FLASH.ic }} />
+          </LegendRow>
+          <LegendRow label="City">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+          </LegendRow>
+          <p className="text-[10px] text-[var(--color-ink-faint)] pt-1 max-w-[15rem] leading-snug border-t border-[var(--color-line-faint)]">
+            Column height encodes convective vigour. Drag to rotate, scroll to
+            zoom, click a marker to inspect.
+          </p>
         </div>
       )}
     </div>
   );
 };
+
+const LegendRow: React.FC<{ label: string; children: React.ReactNode }> = ({
+  label,
+  children,
+}) => (
+  <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-muted)]">
+    <span className="w-16 shrink-0 flex items-center">{children}</span>
+    <span>{label}</span>
+  </div>
+);
+
+// -----------------------------------------------------------------------------
+// Rail furniture
+// -----------------------------------------------------------------------------
+
+/**
+ * A quiet grouping divider. The old build used saturated, icon-laden headers
+ * plus literal "LEFT RAIL" / "RIGHT RAIL" captions, which competed with the
+ * data for attention and leaked internal layout vocabulary to the user.
+ */
+const RailSection: React.FC<{ label: string }> = ({ label }) => (
+  <div className="flex items-center gap-2.5 pt-1 first:pt-0">
+    <span className="eyebrow whitespace-nowrap">{label}</span>
+    <span className="h-px flex-1 bg-[var(--color-line)]" />
+  </div>
+);
+
+// -----------------------------------------------------------------------------
+// Public-mode cards
+// -----------------------------------------------------------------------------
+
+type Threat = ReturnType<typeof assessThunderstormThreat>;
+
+const ThreatHero: React.FC<{ threat: Threat }> = ({ threat }) => (
+  <section
+    className="rounded-[10px] border p-4"
+    style={{ backgroundColor: threat.bgRgba, borderColor: threat.colorHex }}
+  >
+    <div className="flex items-center justify-between gap-2">
+      <span
+        className="text-[11px] font-semibold px-2 py-0.5 rounded-full text-white"
+        style={{ backgroundColor: threat.colorHex }}
+      >
+        {threat.badgeText}
+      </span>
+      <span className="text-[11px] text-[var(--color-ink-muted)] font-mono flex items-center gap-1">
+        <Clock className="w-3 h-3" />
+        Live 0–2 h nowcast
+      </span>
+    </div>
+    <h2 className="text-[17px] font-semibold text-white mt-2.5 leading-snug">
+      {threat.headline}
+    </h2>
+    <p className="text-[13px] text-[var(--color-ink)] mt-1 leading-relaxed opacity-90">
+      {threat.subhead}
+    </p>
+  </section>
+);
+
+const CityRadarCard: React.FC<{
+  currentCity: (typeof MAJOR_INDIAN_CITIES)[number];
+  selectedCity: string;
+  onSelectCity: (id: string) => void;
+  maxDbz: number;
+  hasJump: boolean;
+}> = ({ currentCity, selectedCity, onSelectCity, maxDbz, hasJump }) => (
+  <section className="panel">
+    <header className="panel-header">
+      <h2 className="panel-title flex items-center gap-1.5">
+        <MapPin className="w-3.5 h-3.5" />
+        Local radar
+      </h2>
+      <select
+        value={selectedCity}
+        onChange={(e) => onSelectCity(e.target.value)}
+        aria-label="Select city"
+        className="bg-[var(--color-surface-raised)] text-[var(--color-ink)] text-[12px] rounded-[6px] px-2 py-1 border border-[var(--color-line)] cursor-pointer"
+      >
+        {MAJOR_INDIAN_CITIES.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+    </header>
+
+    <div className="p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[17px] font-semibold truncate">{currentCity.name}</div>
+          <div className="text-[12px] text-[var(--color-ink-faint)]">{currentCity.state}</div>
+        </div>
+        <div className="text-right shrink-0">
+          <div
+            className="text-[12px] font-medium flex items-center gap-1 justify-end"
+            style={{ color: SEVERITY_COLOR.MARGINAL }}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" /> Radar online
+          </div>
+          <div className="text-[11px] font-mono text-[var(--color-ink-faint)]">250 km range</div>
+        </div>
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-[var(--color-line-faint)] grid grid-cols-2 gap-2.5">
+        <Readout
+          label="Rain intensity"
+          value={maxDbz >= 40 ? 'Heavy' : maxDbz >= 25 ? 'Moderate' : 'Light'}
+        />
+        <Readout
+          label="Lightning danger"
+          value={hasJump ? 'High alert' : 'Normal'}
+          tone={hasJump ? SEVERITY_COLOR.SEVERE : undefined}
+        />
+      </div>
+    </div>
+  </section>
+);
+
+const Readout: React.FC<{ label: string; value: string; tone?: string }> = ({
+  label,
+  value,
+  tone,
+}) => (
+  <div className="rounded-[6px] bg-[var(--color-surface-raised)] border border-[var(--color-line-faint)] p-2.5">
+    <div className="eyebrow">{label}</div>
+    <div
+      className="text-[14px] font-medium mt-1"
+      style={{ color: tone ?? 'var(--color-ink)' }}
+    >
+      {value}
+    </div>
+  </div>
+);
+
+const SafetyCard: React.FC<{ actions: string[] }> = ({ actions }) => (
+  <section className="panel">
+    <header className="panel-header">
+      <h2 className="panel-title flex items-center gap-1.5">
+        <ShieldAlert className="w-3.5 h-3.5" />
+        What to do now
+      </h2>
+    </header>
+    <ul className="p-3.5 space-y-2">
+      {actions.map((action, i) => (
+        <li
+          key={i}
+          className="flex items-start gap-2 text-[13px] text-[var(--color-ink-muted)] leading-relaxed"
+        >
+          <span
+            className="w-1 h-1 rounded-full mt-2 shrink-0"
+            style={{ background: 'var(--color-accent)' }}
+          />
+          <span>{action}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+);
+
+const ExplainerCard: React.FC = () => (
+  <section className="panel">
+    <div className="p-3.5">
+      <h2 className="text-[13px] font-medium flex items-center gap-1.5 mb-1.5">
+        <Info className="w-3.5 h-3.5 text-[var(--color-ink-faint)]" />
+        How AeroCast works
+      </h2>
+      <p className="text-[12px] text-[var(--color-ink-muted)] leading-relaxed">
+        AeroCast fuses IMD Doppler radar, ISRO INSAT-3D satellite imagery and
+        ground lightning sensors. A ResAtt-ConvLSTM2D network predicts
+        thunderstorm movement 15 to 120 minutes ahead.
+      </p>
+    </div>
+  </section>
+);
+
+// -----------------------------------------------------------------------------
+// Pro-mode cards
+// -----------------------------------------------------------------------------
+
+const StormCellsCard: React.FC<{
+  cells: NonNullable<ReturnType<typeof useNowcastStore.getState>['nowcastData']>['observation']['storm_cells'];
+  onOpenTracker: () => void;
+}> = ({ cells, onOpenTracker }) => (
+  <section className="panel">
+    <header className="panel-header">
+      <h2 className="panel-title flex items-center gap-1.5">
+        <Activity className="w-3.5 h-3.5" />
+        Storm cells · {cells.length} active
+      </h2>
+      <button
+        onClick={onOpenTracker}
+        className="text-[12px] text-[var(--color-accent)] hover:underline"
+      >
+        Tracker →
+      </button>
+    </header>
+
+    <div className="p-3.5">
+      {cells.length === 0 ? (
+        <p className="text-[12px] text-[var(--color-ink-faint)]">
+          No cells meet the 40 dBZ / 24 km² tracking threshold.
+        </p>
+      ) : (
+        <ul className="space-y-1.5">
+          {cells.slice(0, 3).map((cell) => (
+            <li
+              key={cell.cell_id}
+              className="rounded-[6px] border border-[var(--color-line-faint)] bg-[var(--color-surface-raised)] p-2.5 flex items-center justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: cell.color }}
+                  />
+                  <span className="text-[13px] font-medium">{cell.cell_id}</span>
+                  <span className="text-[11px] font-mono text-[var(--color-ink-faint)]">
+                    {cell.area_km2} km²
+                  </span>
+                </div>
+                <div className="text-[11px] text-[var(--color-ink-faint)] mt-0.5 truncate">
+                  {cell.severity}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[13px] font-mono tabular" style={{ color: SEVERITY_COLOR.SEVERE }}>
+                  {cell.max_dbz} dBZ
+                </div>
+                <div className="text-[11px] text-[var(--color-ink-faint)]">
+                  hail {cell.hail_risk_pct}%
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </section>
+);
