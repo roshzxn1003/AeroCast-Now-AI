@@ -1,4 +1,8 @@
 import {
+  ConvectiveField,
+  DomainSummary,
+  LightningField,
+  NetworkStatus,
   NowcastResponse,
   RadarStation,
   LightningJumpResult,
@@ -229,6 +233,7 @@ function generateFallbackNowcast(station: string, stormMode: string): NowcastRes
       max_vil: 44.5,
       min_tir_c: -78.2,
       flash_rate_fpm: 76.5,
+      history_grids: [],
       storm_cells: activeCells,
       dbz_grid: dbzGrid,
     },
@@ -326,3 +331,28 @@ function generateFallbackLightningData(hasJump: boolean): {
     timeseries,
   };
 }
+
+// =============================================================================
+// LIVE OBSERVATION FEEDS
+// =============================================================================
+
+/**
+ * Live feeds must fail loudly rather than silently substituting fabricated
+ * numbers — a blank panel is honest, an invented CAPE value is not. These
+ * helpers therefore throw, and callers render an offline state.
+ */
+async function getJSON<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`);
+  if (!res.ok) throw new Error(`${path} failed: ${res.status} ${res.statusText}`);
+  return (await res.json()) as T;
+}
+
+export const fetchDomainSummary = () => getJSON<DomainSummary>('/live/summary');
+
+export const fetchConvectiveField = (force = false) =>
+  getJSON<ConvectiveField>(`/live/convective${force ? '?force=true' : ''}`);
+
+export const fetchLightningField = (windowMinutes = 30, limit = 2500) =>
+  getJSON<LightningField>(`/live/strikes?window_minutes=${windowMinutes}&limit=${limit}`);
+
+export const fetchNetworkStatus = () => getJSON<NetworkStatus>('/live/network-status');

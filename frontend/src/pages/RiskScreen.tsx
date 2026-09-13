@@ -76,7 +76,7 @@ export const RiskScreen: React.FC = () => {
       title: 'Urban Drainage & Flood Response',
       icon: Building2,
       status: rainRateMmHr >= 60 ? 'RAPID FLOODING RISK' : 'HEAVY RUNOFF',
-      statusColor: rainRateMmHr >= 60 ? 'bg-red-500/20 text-red-300 border-red-500/30' : 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+      statusColor: rainRateMmHr >= 60 ? 'bg-red-500/20 text-red-300 border-red-500/30' : 'bg-sky-500/20 text-[var(--color-accent)] border-sky-500/30',
       metrics: [
         { label: 'Instantaneous Rain Rate', val: `${rainRateMmHr} mm/hr` },
         { label: 'Storm Water Sump Saturation', val: 'RAPID ACCUMULATION' },
@@ -108,11 +108,11 @@ export const RiskScreen: React.FC = () => {
     <div className="w-full max-w-7xl mx-auto px-3 py-3 lg:px-6 lg:py-4 space-y-4 pb-24 lg:pb-12 animate-in fade-in duration-300">
       {/* Header */}
       <div>
-        <h2 className="text-base lg:text-lg font-extrabold text-slate-100 flex items-center gap-2">
+        <h2 className="text-base lg:text-lg font-semibold text-[var(--color-ink)] flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 text-red-400" />
           Multi-Sector Impact & Disaster Advisories
         </h2>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-[var(--color-ink-muted)]">
           Tailored Convective Vulnerability Assessments for Critical Infrastructure & Public Safety
         </p>
       </div>
@@ -126,22 +126,22 @@ export const RiskScreen: React.FC = () => {
           return (
             <div
               key={sec.id}
-              className="bg-[#161b22] border border-white/10 rounded-xl overflow-hidden transition-all shadow-lg flex flex-col justify-between"
+              className="bg-[var(--color-surface-base)] border border-[var(--color-line)] rounded-[10px] overflow-hidden transition-all shadow-lg flex flex-col justify-between"
             >
               <button
                 onClick={() => setExpandedSector(isExpanded ? null : sec.id)}
-                className="w-full p-3.5 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
+                className="w-full p-3.5 flex items-center justify-between text-left hover:bg-[var(--color-surface-raised)] transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-white/5 text-slate-200 shrink-0">
+                  <div className="p-2.5 rounded-[10px] bg-[var(--color-surface-raised)] text-[var(--color-ink)] shrink-0">
                     <Icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-extrabold text-xs lg:text-sm text-slate-100">
+                    <div className="font-semibold text-xs lg:text-sm text-[var(--color-ink)]">
                       {sec.title}
                     </div>
                     <span
-                      className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border mt-1 inline-block ${sec.statusColor}`}
+                      className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded border mt-1 inline-block ${sec.statusColor}`}
                     >
                       {sec.status}
                     </span>
@@ -149,31 +149,31 @@ export const RiskScreen: React.FC = () => {
                 </div>
 
                 {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-slate-400" />
+                  <ChevronUp className="w-4 h-4 text-[var(--color-ink-muted)]" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  <ChevronDown className="w-4 h-4 text-[var(--color-ink-muted)]" />
                 )}
               </button>
 
               {/* Collapsible / Expanded details */}
               {isExpanded && (
-                <div className="px-3.5 pb-3.5 pt-1 border-t border-white/5 space-y-3 animate-in fade-in duration-200">
+                <div className="px-3.5 pb-3.5 pt-1 border-t border-[var(--color-line-faint)] space-y-3 animate-in fade-in duration-200">
                   <div className="grid grid-cols-3 gap-2 text-center text-xs">
                     {sec.metrics.map((m, i) => (
-                      <div key={i} className="bg-black/30 p-2 rounded-lg border border-white/5">
-                        <div className="text-[10px] text-slate-400 leading-tight">{m.label}</div>
-                        <div className="font-extrabold text-slate-200 mt-1">
+                      <div key={i} className="bg-black/30 p-2 rounded-lg border border-[var(--color-line-faint)]">
+                        <div className="text-[11px] text-[var(--color-ink-muted)] leading-tight">{m.label}</div>
+                        <div className="font-semibold text-[var(--color-ink)] mt-1">
                           {m.val}
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-xs text-slate-300">
-                    <div className="font-bold text-amber-300 text-[10px] uppercase mb-0.5">
+                  <div className="bg-[var(--color-surface-raised)] p-2.5 rounded-lg border border-[var(--color-line-faint)] text-xs text-[var(--color-ink)]">
+                    <div className="font-bold text-amber-300 text-[11px] uppercase mb-0.5">
                       Operational Protocol
                     </div>
-                    <p className="leading-relaxed text-slate-300 text-[11px] lg:text-xs">
+                    <p className="leading-relaxed text-[var(--color-ink)] text-[11px] lg:text-xs">
                       {sec.action}
                     </p>
                   </div>
@@ -185,15 +185,15 @@ export const RiskScreen: React.FC = () => {
       </div>
 
       {/* CAP Export & Sharing */}
-      <div className="bg-[#161b22] border border-white/10 rounded-xl p-4 space-y-3 shadow-lg">
+      <div className="bg-[var(--color-surface-base)] border border-[var(--color-line)] rounded-[10px] p-4 space-y-3 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <AlertOctagon className="w-5 h-5 text-red-400" />
             <div>
-              <h3 className="font-bold text-xs lg:text-sm text-slate-200">
+              <h3 className="font-bold text-xs lg:text-sm text-[var(--color-ink)]">
                 NDMA / IMD CAP v1.2 Standard Alert Payload
               </h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[var(--color-ink-muted)]">
                 Conforming to OASIS Common Alerting Protocol v1.2 standards
               </p>
             </div>
@@ -201,7 +201,7 @@ export const RiskScreen: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyCap}
-              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs flex items-center gap-1.5 px-3 font-medium transition-colors"
+              className="p-1.5 rounded-lg bg-[var(--color-surface-raised)] hover:bg-[var(--color-surface-overlay)] text-[var(--color-ink)] text-xs flex items-center gap-1.5 px-3 font-medium transition-colors"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -216,16 +216,16 @@ export const RiskScreen: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-black/40 rounded-xl p-3 font-mono text-xs text-slate-300 space-y-1.5 border border-white/5">
-          <div><span className="text-slate-500">ID:</span> {cap.identifier}</div>
-          <div><span className="text-slate-500">Sender:</span> {cap.sender}</div>
-          <div><span className="text-slate-500">Event:</span> {cap.info.event}</div>
+        <div className="bg-black/40 rounded-[10px] p-3 font-mono text-xs text-[var(--color-ink)] space-y-1.5 border border-[var(--color-line-faint)]">
+          <div><span className="text-[var(--color-ink-faint)]">ID:</span> {cap.identifier}</div>
+          <div><span className="text-[var(--color-ink-faint)]">Sender:</span> {cap.sender}</div>
+          <div><span className="text-[var(--color-ink-faint)]">Event:</span> {cap.info.event}</div>
           <div>
-            <span className="text-slate-500">Severity:</span> {cap.info.severity} •{' '}
-            <span className="text-slate-500">Urgency:</span> {cap.info.urgency} •{' '}
-            <span className="text-slate-500">Certainty:</span> {cap.info.certainty}
+            <span className="text-[var(--color-ink-faint)]">Severity:</span> {cap.info.severity} •{' '}
+            <span className="text-[var(--color-ink-faint)]">Urgency:</span> {cap.info.urgency} •{' '}
+            <span className="text-[var(--color-ink-faint)]">Certainty:</span> {cap.info.certainty}
           </div>
-          <div><span className="text-slate-500">Area:</span> {cap.info.area.areaDesc}</div>
+          <div><span className="text-[var(--color-ink-faint)]">Area:</span> {cap.info.area.areaDesc}</div>
         </div>
       </div>
     </div>

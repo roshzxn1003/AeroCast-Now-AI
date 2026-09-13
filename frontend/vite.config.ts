@@ -5,6 +5,18 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the two heavy rendering stacks out of the app bundle so the
+        // first paint is not blocked on WebGL and charting code.
+        manualChunks: {
+          globe: ['globe.gl', 'three'],
+          charts: ['recharts'],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

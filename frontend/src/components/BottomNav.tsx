@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, nowcastData } = useNowcastStore();
+  const { activeTab, setActiveTab, nowcastData, uiMode } = useNowcastStore();
 
   const hasJump = nowcastData?.lightning_jump?.jump_detected;
   const activeCellsCount = nowcastData?.observation?.storm_cells?.length || 0;
@@ -18,37 +18,37 @@ export const BottomNav: React.FC = () => {
   const tabs: { id: ActiveTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string | number; badgeColor?: string }[] = [
     {
       id: 'nowcast',
-      label: 'NOWCAST',
+      label: uiMode === 'citizen' ? 'EARTH' : 'NOWCAST',
       icon: Radar,
     },
     {
       id: 'alerts',
-      label: 'ALERTS',
+      label: uiMode === 'citizen' ? 'WARNINGS' : 'ALERTS',
       icon: AlertTriangle,
       badge: hasJump ? 'JUMP' : undefined,
       badgeColor: 'bg-red-500 text-white animate-pulse',
     },
     {
       id: 'storms',
-      label: 'STORMS',
+      label: uiMode === 'citizen' ? 'RADAR' : 'STORMS',
       icon: Activity,
       badge: activeCellsCount > 0 ? activeCellsCount : undefined,
-      badgeColor: 'bg-amber-500 text-slate-900',
+      badgeColor: 'bg-amber-500 text-[#06080b]',
     },
     {
       id: 'risk',
-      label: 'RISK',
+      label: uiMode === 'citizen' ? 'SAFETY' : 'RISK',
       icon: ShieldAlert,
     },
     {
       id: 'more',
-      label: 'MORE',
+      label: uiMode === 'citizen' ? 'ABOUT' : 'MORE',
       icon: Menu,
     },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d1117]/95 backdrop-blur-lg border-t border-white/10 bottom-nav lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-surface-void)]/95 backdrop-blur-lg border-t border-[var(--color-line)] bottom-nav lg:hidden">
       <div className="max-w-md mx-auto grid grid-cols-5 px-1 py-1">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -58,10 +58,10 @@ export const BottomNav: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all duration-200 ${
+              className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-[10px] transition-all duration-200 ${
                 isActive
-                  ? 'text-sky-400 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 font-medium'
+                  ? 'text-[var(--color-accent)] font-bold'
+                  : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] font-medium'
               }`}
             >
               {/* Active indicator dot/glow */}
@@ -72,19 +72,19 @@ export const BottomNav: React.FC = () => {
               <div className="relative mt-0.5">
                 <Icon
                   className={`w-5 h-5 transition-transform ${
-                    isActive ? 'scale-110 text-sky-400' : 'text-slate-400'
+                    isActive ? 'scale-110 text-[var(--color-accent)]' : 'text-[var(--color-ink-muted)]'
                   }`}
                 />
                 {tab.badge && (
                   <span
-                    className={`absolute -top-1 -right-2 text-[9px] font-black px-1 rounded-full leading-tight shadow ${tab.badgeColor}`}
+                    className={`absolute -top-1 -right-2 text-[11px] font-semibold px-1 rounded-full leading-tight shadow ${tab.badgeColor}`}
                   >
                     {tab.badge}
                   </span>
                 )}
               </div>
 
-              <span className="text-[10px] tracking-wider mt-1 font-mono">
+              <span className="text-[11px] tracking-wider mt-1 font-mono">
                 {tab.label}
               </span>
             </button>

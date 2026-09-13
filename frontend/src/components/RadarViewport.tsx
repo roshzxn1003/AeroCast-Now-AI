@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNowcastStore } from '../store/nowcastStore';
-import { ChannelMode, StormCell } from '../types/nowcast';
+import { ChannelMode, GridPoint, StormCell } from '../types/nowcast';
 import {
   Compass,
   Crosshair,
@@ -14,12 +14,18 @@ import {
   Radio,
 } from 'lucide-react';
 
+/** Eight-point compass, indexed by heading/45. */
+const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+
 export const RadarViewport: React.FC = () => {
-  const { nowcastData, channelMode, setChannelMode, timeIndex } = useNowcastStore();
+  const { nowcastData, channelMode, setChannelMode, timeIndex, stations } = useNowcastStore();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedCell, setSelectedCell] = useState<StormCell | null>(null);
   const [enableSweep, setEnableSweep] = useState(true);
   const [sweepAngle, setSweepAngle] = useState(0);
+
+  // Range rings are labelled from the selected station's real coverage.
+  const rangeKm = stations.find((s) => s.name === nowcastData?.station)?.range_km ?? 250;
 
   // Active cells for current timeIndex
   let currentCells: StormCell[] = [];
@@ -31,6 +37,52 @@ export const RadarViewport: React.FC = () => {
       currentCells = fc?.cells || [];
     }
   }
+
+  /**
+   * The grid actually rendered for this timestep.
+   *
+   * Indices 0-3 are observed frames from the ingest tensor; 4-9 are the
+   * ConvLSTM's own output at each lead time. Nothing here is interpolated or
+   * translated - each frame is the field the backend produced for that time.
+   */
+  const activeGrid: GridPoint[] = React.useMemo(() => {
+    if (!nowcastData) return [];
+    if (timeIndex <= 3) {
+      const history = nowcastData.observation.history_grids ?? [];
+      const frame = history[timeIndex];
+      if (frame) return channelMode === 'vil' ? frame.vil : frame.dbz;
+      return nowcastData.observation.dbz_grid ?? [];
+    }
+    const grid = nowcastData.forecast_grids?.[timeIndex - 4];
+    if (!grid) return [];
+    return channelMode === 'vil' ? grid.vil : grid.dbz;
+  }, [nowcastData, timeIndex, channelMode]);
+
+  /**
+   * Mean storm motion across the tracked cells, in km/h and compass degrees.
+   * Previously this readout was a hardcoded string; it is now computed from the
+   * SCIT kinematic vectors actually being displayed.
+   */
+  const motion = React.useMemo(() => {
+    if (currentCells.length === 0) return null;
+    // Average the heading as a unit vector so that, e.g., 350 deg and 10 deg
+    // average to 0 rather than to 180.
+    let vx = 0;
+    let vy = 0;
+    let speed = 0;
+    currentCells.forEach((cell) => {
+      const rad = (cell.heading_deg * Math.PI) / 180;
+      vx += Math.sin(rad);
+      vy += Math.cos(rad);
+      speed += cell.speed_kmh;
+    });
+    const heading = ((Math.atan2(vx, vy) * 180) / Math.PI + 360) % 360;
+    return {
+      heading: Math.round(heading),
+      speed: Math.round(speed / currentCells.length),
+      compass: COMPASS_POINTS[Math.round(heading / 45) % 8],
+    };
+  }, [currentCells]);
 
   // Radar sweep rotation animation loop
   useEffect(() => {
@@ -95,11 +147,13 @@ export const RadarViewport: React.FC = () => {
     ctx.lineTo(center + d45, center - d45);
     ctx.stroke();
 
-    // Render Convective Storm Grid (32x32 heatmap simulation)
-    const shiftX = (timeIndex - 3) * 8;
-    const shiftY = -(timeIndex - 3) * 5;
+    // Render the field for this timestep. There is deliberately no positional
+    // offset: an earlier build slid the current frame sideways to imply motion,
+    // which made the display disagree with the model it was meant to show.
+    const shiftX = 0;
+    const shiftY = 0;
 
-    const grid = nowcastData.observation.dbz_grid || [];
+    const grid = activeGrid;
     grid.forEach((pt) => {
       const px = (pt.x / 32) * (maxRadius * 1.6) + (center - maxRadius * 0.8) + shiftX;
       const py = (pt.y / 32) * (maxRadius * 1.6) + (center - maxRadius * 0.8) + shiftY;
@@ -131,7 +185,7 @@ export const RadarViewport: React.FC = () => {
 
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(px, py, 22, 0, Math.PI * 2);
+      ctx.arc(px, py, 13, 0, Math.PI * 2);
       ctx.fill();
     });
 
@@ -238,11 +292,12 @@ export const RadarViewport: React.FC = () => {
     // Range Ring Labels (km)
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.font = '9px monospace';
-    ctx.fillText('62 km', center + maxRadius * 0.25 + 3, center - 5);
-    ctx.fillText('125 km', center + maxRadius * 0.5 + 3, center - 5);
-    ctx.fillText('188 km', center + maxRadius * 0.75 + 3, center - 5);
-    ctx.fillText('250 km', center + maxRadius * 1.0 - 36, center - 5);
-  }, [nowcastData, channelMode, timeIndex, currentCells, enableSweep, sweepAngle, selectedCell]);
+    [0.25, 0.5, 0.75, 1.0].forEach((r) => {
+      const label = `${Math.round(rangeKm * r)} km`;
+      const x = center + maxRadius * r + (r === 1.0 ? -36 : 3);
+      ctx.fillText(label, x, center - 5);
+    });
+  }, [nowcastData, channelMode, timeIndex, currentCells, activeGrid, enableSweep, sweepAngle, selectedCell, rangeKm]);
 
   // Handle Canvas Click to Select Storm Cell
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -254,8 +309,8 @@ export const RadarViewport: React.FC = () => {
 
     const center = canvas.width / 2;
     const maxRadius = center * 0.90;
-    const shiftX = (timeIndex - 3) * 8;
-    const shiftY = -(timeIndex - 3) * 5;
+    const shiftX = 0;
+    const shiftY = 0;
 
     // Check if clicked near any storm cell
     for (const cell of currentCells) {
@@ -330,13 +385,22 @@ export const RadarViewport: React.FC = () => {
         {/* Compass Cardinal Badge */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[11px] text-slate-300 font-mono shadow">
           <Compass className="w-3.5 h-3.5 text-sky-400" />
-          <span>N 000° • 250km RADIAL</span>
+          <span>
+            NORTH-UP • {nowcastData?.station ? `${rangeKm} KM RANGE` : 'RANGE —'}
+          </span>
         </div>
 
         {/* Convective Motion Vector Heading Badge */}
         <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[11px] text-amber-300 font-mono shadow flex items-center gap-1.5">
-          <Navigation className="w-3 h-3 text-amber-400" />
-          <span>ENE 65° @ 42km/h</span>
+          <Navigation
+            className="w-3 h-3 text-amber-400"
+            style={motion ? { transform: `rotate(${motion.heading}deg)` } : undefined}
+          />
+          <span>
+            {motion
+              ? `${motion.compass} ${String(motion.heading).padStart(3, '0')}° @ ${motion.speed} km/h`
+              : 'NO TRACKED CELLS'}
+          </span>
         </div>
 
         {/* Selected Cell Floating HUD Inspector Popover */}
@@ -383,7 +447,10 @@ export const RadarViewport: React.FC = () => {
 
             <div className="text-[10px] text-slate-400 font-mono pt-1 border-t border-white/5 flex justify-between">
               <span>Velocity: {selectedCell.speed_kmh} km/h</span>
-              <span>Heading: {selectedCell.heading_deg}° ENE</span>
+              <span>
+                Heading: {String(selectedCell.heading_deg).padStart(3, '0')}°{' '}
+                {COMPASS_POINTS[Math.round(selectedCell.heading_deg / 45) % 8]}
+              </span>
             </div>
           </div>
         )}

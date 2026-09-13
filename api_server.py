@@ -27,6 +27,15 @@ from observation_service import (
     ingest_nowcast_multimodal_tensor,
     generate_lightning_jump_timeseries,
 )
+from live_data_service import (
+    CONVECTIVE_NODES,
+    INDIA_BBOX,
+    fetch_live_convective,
+    get_domain_summary,
+    get_lightning_field,
+    ldn_status,
+    start_lightning_network,
+)
 from nowcasting_engine import (
     load_nowcasting_model,
     predict_nowcast_sequence,
@@ -58,6 +67,12 @@ app.add_middleware(
 _model = None
 _model_metadata = None
 _startup_time = datetime.now().isoformat()
+
+
+@app.on_event("startup")
+async def _boot_live_feeds() -> None:
+    """Begin consuming the lightning detection network in the background."""
+    start_lightning_network()
 
 
 def _get_model():
@@ -189,6 +204,20 @@ async def run_nowcast(
     # Current observation storm cells
     obs_cells = identify_and_track_storm_cells(last_obs_dbz, last_obs_vil)
 
+    # Observed history frames. The ingest tensor holds the full -45..0 min
+    # sequence; surfacing every frame lets the client scrub real observations
+    # rather than interpolating a single one.
+    history_offsets = [-45, -30, -15, 0]
+    history_grids = []
+    n_history = tensor.shape[0]
+    for i in range(n_history):
+        offset = history_offsets[i] if i < len(history_offsets) else (i - n_history + 1) * 15
+        history_grids.append({
+            "offset_min": offset,
+            "dbz": _grid_to_heatmap(tensor[i, :, :, 0] * 75.0, 2),
+            "vil": _grid_to_heatmap(tensor[i, :, :, 1] * 65.0, 2),
+        })
+
     # Forecast storm cells at each lead time
     forecast_cells_by_step = []
     forecast_grids = []
@@ -213,8 +242,8 @@ async def run_nowcast(
         # Convert grids to lists for JSON (downsampled for bandwidth)
         forecast_grids.append({
             "lead_time_min": lead_times[step_idx] if step_idx < len(lead_times) else (step_idx + 1) * 15,
-            "dbz": _grid_to_heatmap(fc_dbz, 8),
-            "vil": _grid_to_heatmap(fc_vil, 8),
+            "dbz": _grid_to_heatmap(fc_dbz, 2),
+            "vil": _grid_to_heatmap(fc_vil, 2),
         })
 
     # 4. Lightning Jump
@@ -247,7 +276,8 @@ async def run_nowcast(
             "min_tir_c": obs_metadata["min_observed_tir_c"],
             "flash_rate_fpm": obs_metadata["total_current_flash_rate_fpm"],
             "storm_cells": obs_cells,
-            "dbz_grid": _grid_to_heatmap(last_obs_dbz, 8),
+            "dbz_grid": _grid_to_heatmap(last_obs_dbz, 2),
+            "history_grids": history_grids,
         },
         "sounding": obs_metadata["sounding"],
         "forecast": forecast_cells_by_step,
@@ -384,6 +414,82 @@ async def get_radar_grid(
             "range_km": station_info["range_km"],
         },
     }
+
+
+# ==============================================================================
+# LIVE OBSERVATION FEEDS (GLOBE)
+# ==============================================================================
+
+@app.get("/api/live/summary")
+async def live_summary():
+    """Headline live-domain figures for the globe status strip."""
+    return get_domain_summary()
+
+
+@app.get("/api/live/convective")
+async def live_convective(force: bool = Query(default=False, description="Bypass the 5-minute cache")):
+    """Live CAPE / Lifted Index / CIN analysis across the Indian domain."""
+    return fetch_live_convective(force=force)
+
+
+@app.get("/api/live/strikes")
+async def live_strikes(
+    window_minutes: int = Query(default=30, ge=5, le=120, description="Rolling strike window"),
+    limit: int = Query(default=2500, ge=100, le=20000, description="Max strikes returned"),
+):
+    """
+    Lightning field over India.
+
+    Serves measured Blitzortung LDN geolocations when the detection network is
+    reachable, otherwise a flash field derived from the live convective
+    analysis. The `status` field states which — LIVE or LIVE-DERIVED.
+    """
+    field = get_lightning_field(window_minutes=window_minutes)
+    strikes = field["strikes"]
+    if len(strikes) > limit:
+        field = {**field, "strikes": strikes[:limit], "truncated": True}
+    return field
+
+
+@app.get("/api/live/network-status")
+async def live_network_status():
+    """Connection state of every upstream observation provider."""
+    convective = fetch_live_convective()
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "domain": INDIA_BBOX,
+        "providers": [
+            {
+                "id": "ldn",
+                "name": "Blitzortung.org Lightning Detection Network",
+                "role": "Real-time IC/CG strike geolocation",
+                **ldn_status(),
+            },
+            {
+                "id": "open_meteo",
+                "name": "Open-Meteo Convective Analysis",
+                "role": "Live CAPE / Lifted Index / CIN / WMO weather codes",
+                "connected": convective.get("status") in ("LIVE", "STALE"),
+                "status": convective.get("status"),
+                "nodes": convective.get("node_count", 0),
+                "retrieved_at": convective.get("retrieved_at"),
+            },
+            {
+                "id": "dwr",
+                "name": "IMD Doppler Weather Radar Network",
+                "role": "Reflectivity / VIL / echo-top tensor channels",
+                "connected": True,
+                "status": "MODEL",
+                "stations": len(RADAR_STATIONS),
+            },
+        ],
+    }
+
+
+@app.get("/api/live/nodes")
+async def live_nodes():
+    """Static metadata for the convective sampling nodes."""
+    return {"nodes": CONVECTIVE_NODES, "count": len(CONVECTIVE_NODES), "domain": INDIA_BBOX}
 
 
 # ==============================================================================

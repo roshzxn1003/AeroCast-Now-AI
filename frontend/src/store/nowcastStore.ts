@@ -46,6 +46,12 @@ interface NowcastState {
   timeIndex: number;
   isPlaying: boolean;
 
+  // UI Mode (Citizen for plain English vs Pro for scientific telemetry)
+  uiMode: 'citizen' | 'pro';
+  soundEnabled: boolean;
+  earthTheme: 'night' | 'day';
+  selectedCity: string;
+
   // Parameters
   selectedStation: string;
   stormScenario: StormScenario;
@@ -67,6 +73,10 @@ interface NowcastState {
   setChannelMode: (mode: ChannelMode) => void;
   setTimeIndex: (idx: number) => void;
   togglePlayback: () => void;
+  setUiMode: (mode: 'citizen' | 'pro') => void;
+  setSoundEnabled: (enabled: boolean) => void;
+  setEarthTheme: (theme: 'night' | 'day') => void;
+  setSelectedCity: (cityId: string) => void;
   setSelectedStation: (station: string) => void;
   setStormScenario: (scenario: StormScenario) => void;
   setHasJump: (hasJump: boolean) => void;
@@ -82,6 +92,11 @@ export const useNowcastStore = create<NowcastState>((set, get) => ({
   channelMode: 'dbz',
   timeIndex: 3, // Default to NOW (0 min observed)
   isPlaying: false,
+
+  uiMode: 'citizen', // Default to citizen friendly mode
+  soundEnabled: false, // Default muted until user toggles on
+  earthTheme: 'night',
+  selectedCity: 'chennai',
 
   selectedStation: 'Chennai DWR (Sriharikota/Port)',
   stormScenario: 'Severe Squall Line',
@@ -99,6 +114,10 @@ export const useNowcastStore = create<NowcastState>((set, get) => ({
   setMoreSubScreen: (sub) => set({ moreSubScreen: sub }),
   setChannelMode: (mode) => set({ channelMode: mode }),
   setTimeIndex: (idx) => set({ timeIndex: Math.max(0, Math.min(9, idx)) }),
+  setUiMode: (mode) => set({ uiMode: mode }),
+  setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
+  setEarthTheme: (theme) => set({ earthTheme: theme }),
+  setSelectedCity: (cityId) => set({ selectedCity: cityId }),
 
   togglePlayback: () => {
     const { isPlaying } = get();

@@ -1,110 +1,231 @@
 @import "tailwindcss";
 
+/* =============================================================================
+   AeroCast-Now design system
+
+   The visual language is an operations console, not a consumer weather app.
+   Chrome stays near-monochrome so that saturated colour carries exactly one
+   meaning: meteorological intensity. Anything that is not data is grey.
+   ========================================================================== */
+
 @theme {
-  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --color-bg-app: #0d1117;
-  --color-bg-card: rgba(22, 27, 34, 0.8);
-  --color-bg-card-solid: #161b22;
-  --color-border-subtle: rgba(255, 255, 255, 0.08);
-  --color-border-active: rgba(248, 113, 113, 0.4);
-  --color-text-primary: #e6edf3;
-  --color-text-muted: #94a3b8;
-  --color-text-dim: #64748b;
-  --color-severe-red: #ef4444;
-  --color-intense-orange: #f97316;
-  --color-watch-amber: #f59e0b;
-  --color-flash-yellow: #facc15;
-  --color-normal-green: #10b981;
-  --color-vil-cyan: #38bdf8;
-  --color-satellite-purple: #c084fc;
-  --color-developing-blue: #3b82f6;
+  /* -- Typography ---------------------------------------------------------
+     Two families only. Inter for prose, JetBrains Mono for every number, so
+     readings stay column-aligned and tabular as values change.             */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* -- Surfaces -----------------------------------------------------------
+     Four elevation steps. Anything needing a fifth is over-nested.         */
+  --color-surface-void: #06080b;    /* Page ground, and the globe's field  */
+  --color-surface-base: #0b0f14;    /* Panel body                          */
+  --color-surface-raised: #121820;  /* Cards inside panels                 */
+  --color-surface-overlay: #18202a; /* Popovers, menus, hover states       */
+
+  /* -- Lines --------------------------------------------------------------  */
+  --color-line-faint: rgba(255, 255, 255, 0.05);
+  --color-line: rgba(255, 255, 255, 0.09);
+  --color-line-strong: rgba(255, 255, 255, 0.16);
+
+  /* -- Text ---------------------------------------------------------------
+     Three weights of emphasis. Labels are never pure white.                */
+  --color-ink: #e9eef4;
+  --color-ink-muted: #96a3b2;
+  --color-ink-faint: #5d6a78;
+
+  /* -- Instrument accent --------------------------------------------------
+     One accent for interactive affordances. Deliberately cool and narrow so
+     it never competes with the hazard ramp.                                */
+  --color-accent: #4cc2ff;
+  --color-accent-dim: rgba(76, 194, 255, 0.14);
+  --color-accent-line: rgba(76, 194, 255, 0.38);
+
+  /* -- Hazard ramp --------------------------------------------------------
+     Ordered severity scale. Used for convective instability, cell severity
+     and alert states alike, so one colour always means one level.          */
+  --color-sev-stable: #4b8ea8;
+  --color-sev-marginal: #3fae8f;
+  --color-sev-moderate: #d4a13a;
+  --color-sev-severe: #e2703a;
+  --color-sev-extreme: #d9434e;
+
+  /* -- Reflectivity ramp (dBZ) -------------------------------------------
+     Perceptually ordered, matches operational radar convention.            */
+  --color-dbz-05: #1f4e6b;
+  --color-dbz-20: #2f8f6e;
+  --color-dbz-30: #9dbf3f;
+  --color-dbz-40: #e0b93c;
+  --color-dbz-50: #e2743a;
+  --color-dbz-60: #d1394b;
+  --color-dbz-70: #b84fc4;
+
+  /* -- Lightning ----------------------------------------------------------  */
+  --color-flash-cg: #ffd45e;   /* Cloud-to-ground: reaches people          */
+  --color-flash-ic: #7fb6ff;   /* Intra-cloud: aloft only                  */
+
+  /* -- Provenance ---------------------------------------------------------
+     Live, derived and modelled data are never allowed to look alike.       */
+  --color-prov-live: #3fae8f;
+  --color-prov-derived: #d4a13a;
+  --color-prov-model: #8b93a0;
 }
 
-/* Safe area insets for mobile */
+/* -- Type scale ------------------------------------------------------------
+   Seven steps, nothing between them. The previous build mixed 8/9/10/11px
+   arbitrarily; every size below is a deliberate rung.                     */
 :root {
-  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --text-micro: 0.6875rem;  /* 11px - axis ticks, unit suffixes           */
+  --text-label: 0.75rem;    /* 12px - field labels, table cells            */
+  --text-body: 0.8125rem;   /* 13px - default UI text                      */
+  --text-lead: 0.9375rem;   /* 15px - panel titles                         */
+  --text-stat: 1.375rem;    /* 22px - single readings                      */
+  --text-hero: 2rem;        /* 32px - the one figure that matters most     */
+  --text-display: 2.75rem;  /* 44px - headline count on the globe          */
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html,
+body {
+  background: var(--color-surface-void);
+  color: var(--color-ink);
 }
 
 body {
   font-family: var(--font-sans);
-  background: radial-gradient(circle at 10% 20%, #0d1117 0%, #07090d 90%);
+  font-size: var(--text-body);
+  line-height: 1.5;
   min-height: 100dvh;
+  margin: 0;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overscroll-behavior: none;
 }
 
-/* Glass card effect */
-.glass-card {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  transition: border-color 0.2s ease;
+/* Numerals must not jitter as live values tick over. */
+.tabular,
+.font-mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
-.glass-card:hover {
-  border-color: var(--color-border-active);
+/* -- Panel -----------------------------------------------------------------
+   The single container primitive. Flat, hairline-bordered, no glass blur and
+   no drop shadow - depth comes from the surface ramp alone.               */
+.panel {
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
 }
 
-/* Gradient text for hero */
-.gradient-text {
-  background: linear-gradient(90deg, #f87171, #fb923c, #38bdf8, #c084fc);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--color-line-faint);
 }
 
-/* Pulse animation for alerts */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
-  50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.6); }
+.panel-title {
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
 }
 
-.alert-pulse {
-  animation: pulse-glow 2s ease-in-out infinite;
+/* -- Eyebrow label ---------------------------------------------------------  */
+.eyebrow {
+  font-size: var(--text-micro);
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
 }
 
-/* Bottom nav safe area */
+/* -- Mobile nav safe area -------------------------------------------------- */
 .bottom-nav {
-  padding-bottom: calc(8px + var(--safe-area-inset-bottom));
+  padding-bottom: calc(0.5rem + var(--safe-bottom));
 }
 
-/* Scrollbar styling */
+/* -- Focus -----------------------------------------------------------------
+   Visible keyboard focus everywhere. Operators use keyboards.             */
+:where(button, a, select, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* -- Scrollbars ------------------------------------------------------------  */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* Leaflet dark theme overrides */
-.leaflet-container {
-  background: #0d1117 !important;
+.scrollbar-none {
+  scrollbar-width: none;
 }
-.leaflet-tile-pane {
-  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
-}
-.leaflet-control-zoom a {
-  background: #161b22 !important;
-  color: #e6edf3 !important;
-  border-color: rgba(255,255,255,0.1) !important;
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
-/* Simulated data badge */
-.sim-badge {
-  background: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+/* -- Motion ----------------------------------------------------------------
+   Two animations exist: a slow breathing pulse for live telemetry, and a
+   strike ripple. Both respect reduced-motion.                             */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.live-dot {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes sweep-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.enter {
+  animation: sweep-in 0.24s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
