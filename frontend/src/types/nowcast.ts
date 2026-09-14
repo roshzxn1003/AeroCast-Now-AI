@@ -409,3 +409,110 @@ export interface DistrictSummaryResponse {
   districts: DistrictSummaryItem[];
 }
 
+export interface StateDistrictEntry {
+  id: string;
+  name: string;
+  state: string;
+  threat_level: 'EXTREME' | 'SEVERE' | 'MODERATE' | 'LOW' | 'STABLE' | string;
+  threat_color: string;
+  max_reflectivity_dbz: number;
+  vil_kg_m2: number;
+  cape_j_kg: number;
+  wind_gust_kmh: number;
+  eta_minutes: number | null;
+  distance_to_core_km: number | null;
+  lat: number;
+  lon: number;
+  bbox?: number[];
+}
+
+export interface StateAviationHub {
+  airport: string;
+  iata: string;
+  status: 'GROUND_STOP_ALERT' | 'CAUTION_HOLDING' | 'NORMAL_OPS' | string;
+  color: string;
+  threat_level: string;
+  reflectivity_dbz: number;
+  wind_gust_kmh: number;
+  advisory: string;
+}
+
+export interface StateSectorImpacts {
+  aviation: StateAviationHub[];
+  power_grid: {
+    authority: string;
+    risk_level: string;
+    risk_color: string;
+    trip_probability_pct: number;
+    description: string;
+  };
+  agriculture: {
+    zone: string;
+    risk_level: string;
+    description: string;
+  };
+  marine_and_ports: {
+    coastal_stretch: string;
+    risk_level: string;
+    description: string;
+  };
+  urban_drainage: {
+    focus_area: string;
+    risk_level: string;
+    description: string;
+  };
+}
+
+export interface StateReportSummary {
+  districts_monitored: number;
+  highest_threat: string;
+  highest_threat_color: string;
+  peak_reflectivity_dbz: number;
+  max_cape_j_kg: number;
+  active_lightning_strikes: number;
+  extreme_count: number;
+  severe_count: number;
+  moderate_count: number;
+  stable_count: number;
+  nearest_radar_station: string;
+  camera_center: {
+    lat: number;
+    lng: number;
+    altitude: number;
+  };
+}
+
+export interface StateReportCapBulletin {
+  identifier: string;
+  sender: string;
+  sent: string;
+  status: string;
+  msgType: string;
+  scope: string;
+  category: string;
+  urgency: string;
+  severity: string;
+  certainty: string;
+  event: string;
+  headline: string;
+  description: string;
+  instruction: string;
+  areaDesc: string;
+}
+
+export interface StateConvectiveReport {
+  state: string;
+  state_slug: string;
+  timestamp: string;
+  summary: StateReportSummary;
+  districts: StateDistrictEntry[];
+  sector_impacts: StateSectorImpacts;
+  advisory: {
+    en: string;
+    ta?: string;
+    hi?: string;
+  };
+  cap_bulletin: StateReportCapBulletin;
+}
+
+

@@ -36,6 +36,10 @@ export interface CityPreset {
 
 export const MAJOR_INDIAN_CITIES: CityPreset[] = [
   { id: 'chennai', name: 'Chennai', state: 'Tamil Nadu', lat: 13.0827, lng: 80.2707, stationName: 'Chennai DWR (Sriharikota/Port)', dwrRadarName: 'Chennai Doppler Radar' },
+  { id: 'coimbatore', name: 'Coimbatore', state: 'Tamil Nadu', lat: 11.0168, lng: 76.9558, stationName: 'Coimbatore Hub', dwrRadarName: 'Western Ghats Station', labelSide: 'left' },
+  { id: 'madurai', name: 'Madurai', state: 'Tamil Nadu', lat: 9.9252, lng: 78.1198, stationName: 'Madurai Radar', dwrRadarName: 'South TN Radar Station' },
+  { id: 'trichy', name: 'Tiruchirappalli', state: 'Tamil Nadu', lat: 10.7905, lng: 78.7047, stationName: 'Trichy Hub', dwrRadarName: 'Cauvery Doppler Station' },
+  { id: 'salem', name: 'Salem', state: 'Tamil Nadu', lat: 11.6643, lng: 78.1460, stationName: 'Salem Hub', dwrRadarName: 'Shevaroys Radar', labelSide: 'left' },
   { id: 'bengaluru', name: 'Bengaluru', state: 'Karnataka', lat: 12.9716, lng: 77.5946, stationName: 'Bengaluru DWR', dwrRadarName: 'Bengaluru Radar', labelSide: 'left' },
   { id: 'mumbai', name: 'Mumbai', state: 'Maharashtra', lat: 19.0760, lng: 72.8777, stationName: 'Mumbai DWR (Colaba)', dwrRadarName: 'Mumbai DWR' },
   { id: 'delhi', name: 'Delhi NCR', state: 'Delhi', lat: 28.6139, lng: 77.2090, stationName: 'Delhi DWR (Mausam Bhavan)', dwrRadarName: 'Mausam Bhavan DWR' },

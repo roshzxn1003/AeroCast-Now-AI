@@ -9,7 +9,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GlobeInstance } from 'globe.gl';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Layers, ChevronDown, ChevronUp, Zap, Info } from 'lucide-react';
 import {
   attachDistrictLayer,
   BORDER_VISIBLE_ALTITUDE,
@@ -24,7 +24,8 @@ import {
 } from '../services/districtWeather';
 import { DistrictSearch, SearchResult } from './DistrictSearch';
 import { DistrictDetailPanel } from './DistrictDetailPanel';
-import { SEVERITY_COLOR, SEVERITY_LEVELS, SeverityLevel } from '../design/tokens';
+import { FLASH, SEVERITY_COLOR, SEVERITY_LEVELS, SeverityLevel } from '../design/tokens';
+import { useNowcastStore } from '../store/nowcastStore';
 import '../styles/districts.css';
 
 interface DistrictOverlayProps {
@@ -76,6 +77,8 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
   const [index, setIndex] = useState<Map<string, District>>(new Map());
   const [tileZoom, setTileZoom] = useState<number | null>(null);
   const [attribution, setAttribution] = useState('');
+
+  const earthTheme = useNowcastStore((s) => s.earthTheme);
 
   // One basemap, always true-colour imagery. The globe's day/night control
   // still swaps the far-view Earth texture and atmosphere, but it no longer
@@ -172,6 +175,7 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
       onZoomChange: setTileZoom,
     });
     tileRef.current = handle;
+    handle.setTheme?.(earthTheme);
     setAttribution(handle.attribution());
     // Development-only handle, alongside the globe's own __globe, so the
     // basemap can be toggled and inspected when diagnosing layer ordering.
@@ -186,6 +190,10 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
     // rebuilding the layer, so this intentionally depends on the globe alone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [globe]);
+
+  useEffect(() => {
+    tileRef.current?.setTheme?.(earthTheme);
+  }, [earthTheme]);
 
   useEffect(() => {
     const handle = tileRef.current;
@@ -206,7 +214,13 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
 
     attachDistrictLayer(globe, container, {
       onHover: (d) => setHovered(d),
-      onSelect: (d) => setSelected(d),
+      onSelect: (d) => {
+        setSelected(d);
+        if (d) {
+          layerRef.current?.flyTo(d.id, 900);
+          loadWeatherFor([d]);
+        }
+      },
       onViewportChange,
     })
       .then((h) => {
@@ -282,6 +296,9 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
     ? (index.get(selected.id) ?? selected)
     : null;
 
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendTab, setLegendTab] = useState<'districts' | 'radar'>('districts');
+
   return (
     <>
       <DistrictSearch onSelect={onSearchSelect} className="district-search-dock" />
@@ -289,7 +306,7 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
       {hovered && !layerError && (
         <div className="district-hover" role="status">
           <span className="district-hover__name">{hovered.name}</span>
-          <span className="district-hover__state">{hovered.state}</span>
+          <span className="district-hover__state text-slate-400">· {hovered.state}</span>
           <HoverSeverity id={hovered.id} />
         </div>
       )}
@@ -303,47 +320,130 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
         />
       )}
 
-      <div className="district-legend">
-        <div className="district-legend__head">
-          <span className="district-legend__title">Convective threat</span>
-          {!layerReady && !layerError && (
-            <Loader2 className="w-3 h-3 spin" style={{ color: 'var(--color-ink-faint)' }} />
-          )}
-        </div>
+      {/* Unified Collapsible Legend & Layers Widget */}
+      <div className="absolute bottom-4 left-4 z-20">
+        {!legendOpen ? (
+          <button
+            onClick={() => setLegendOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/95 border border-white/10 text-xs font-mono text-slate-300 hover:text-white shadow-xl backdrop-blur-md transition-all hover:border-cyan-500/40"
+            title="Open Map Legend & Layer Reference"
+          >
+            <Layers className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="font-semibold">Map Legend</span>
+            <ChevronUp className="w-3 h-3 text-slate-400" />
+          </button>
+        ) : (
+          <div className="district-legend enter">
+            <div className="district-legend__head pb-1.5 border-b border-white/10">
+              <div className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="district-legend__title">Map Legend</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {!layerReady && !layerError && (
+                  <Loader2 className="w-3 h-3 spin text-cyan-400" />
+                )}
+                <button
+                  onClick={() => setLegendOpen(false)}
+                  className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Collapse Legend"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
 
-        <div
-          className="district-legend__scale"
-          role="img"
-          aria-label="Threat scale from stable to extreme"
-        >
-          {legend.map(({ level, color }) => (
-            <span key={level} title={level} style={{ background: color }} />
-          ))}
-        </div>
-        <div className="district-legend__ends">
-          <span>Stable</span>
-          <span>Extreme</span>
-        </div>
+            {/* Tabs */}
+            <div className="flex rounded-lg bg-black/40 p-0.5 mt-2 text-[10px] font-mono">
+              <button
+                onClick={() => setLegendTab('districts')}
+                className={`flex-1 py-1 rounded-md transition-all font-semibold ${
+                  legendTab === 'districts'
+                    ? 'bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Districts
+              </button>
+              <button
+                onClick={() => setLegendTab('radar')}
+                className={`flex-1 py-1 rounded-md transition-all font-semibold ${
+                  legendTab === 'radar'
+                    ? 'bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Lightning & Radar
+              </button>
+            </div>
 
-        <p className="district-legend__note">
-          {layerError
-            ? 'District boundaries unavailable'
-            : !layerReady
-              ? 'Loading districts…'
-              : limited
-                ? `Provider rate limited · resumes ${new Date(
-                    providerStatus().retryAt,
-                  ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : scored > 0
-                  ? `${scored} of 734 districts scored`
-                  : '734 districts · zoom in to score'}
-        </p>
+            {legendTab === 'districts' ? (
+              <div className="mt-2.5 space-y-2">
+                <div
+                  className="district-legend__scale"
+                  role="img"
+                  aria-label="Threat scale from stable to extreme"
+                >
+                  {legend.map(({ level, color }) => (
+                    <span key={level} title={level} style={{ background: color }} />
+                  ))}
+                </div>
+                <div className="district-legend__ends text-[10px] font-mono">
+                  <span className="text-sky-300">Stable</span>
+                  <span className="text-amber-300">Severe</span>
+                  <span className="text-fuchsia-400">Extreme</span>
+                </div>
 
-        {attribution && (
-          <p className="district-legend__credit" title={attribution}>
-            {tileZoom != null ? `z${tileZoom} · ` : ''}
-            {attribution}
-          </p>
+                <p className="district-legend__note text-[11px] leading-relaxed">
+                  {layerError
+                    ? 'District boundaries unavailable'
+                    : !layerReady
+                      ? 'Loading 734 districts…'
+                      : limited
+                        ? `Provider limited · resumes ${new Date(
+                            providerStatus().retryAt,
+                          ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : scored > 0
+                          ? `${scored} of 734 districts scored`
+                          : '734 districts · zoom in to score'}
+                </p>
+
+                {attribution && (
+                  <p className="district-legend__credit" title={attribution}>
+                    {tileZoom != null ? `z${tileZoom} · ` : ''}
+                    {attribution}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2.5 space-y-1.5 text-[11px]">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: FLASH.cg }} />
+                    <span>Ground Strike (CG)</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-amber-400">Amber</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: FLASH.ic }} />
+                    <span>In-Cloud Flash (IC)</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-purple-400">Violet</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                    <span>DWR Radar City</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-cyan-400">250km</span>
+                </div>
+                <div className="pt-1.5 border-t border-white/10 text-[10px] text-slate-400 leading-snug">
+                  Sounding column height encodes convective vigour. Double-click or scroll to zoom.
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </>

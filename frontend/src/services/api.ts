@@ -14,6 +14,7 @@ import {
   GridPoint,
   DistrictNowcastResponse,
   DistrictSummaryResponse,
+  StateConvectiveReport,
 } from '../types/nowcast';
 
 const API_BASE = '/api';
@@ -171,6 +172,18 @@ export async function searchDistrictsApi(query: string, limit: number = 15): Pro
     return [];
   }
 }
+
+export async function fetchStateConvectiveReport(stateSlug: string = 'tamil-nadu'): Promise<StateConvectiveReport | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/reports/state/${encodeURIComponent(stateSlug)}`);
+    if (!res.ok) throw new Error(`State convective report failed: ${res.statusText}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`State report fetch error for ${stateSlug}:`, err);
+    return null;
+  }
+}
+
 
 // ==============================================================================
 // REALISTIC FALLBACK SIMULATOR (used when backend is offline or loading)

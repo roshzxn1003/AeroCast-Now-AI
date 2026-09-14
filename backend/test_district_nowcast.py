@@ -136,6 +136,23 @@ class TestDistrictAPIEndpoints(unittest.TestCase):
         self.assertIn("nowcast_timeline", data)
         self.assertEqual(len(data["nowcast_timeline"]), 6)
 
+    def test_state_report_endpoint_tamil_nadu(self):
+        resp = self.client.get("/api/v1/reports/state/tamil-nadu")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["state"], "Tamil Nadu")
+        self.assertEqual(len(data["districts"]), 38)
+        self.assertIn("summary", data)
+        self.assertIn("sector_impacts", data)
+        self.assertIn("aviation", data["sector_impacts"])
+        self.assertGreaterEqual(len(data["sector_impacts"]["aviation"]), 4)
+        self.assertIn("advisory", data)
+        self.assertIn("en", data["advisory"])
+        self.assertIn("ta", data["advisory"])
+        self.assertIn("hi", data["advisory"])
+        self.assertIn("cap_bulletin", data)
+
 
 if __name__ == "__main__":
     unittest.main()
+

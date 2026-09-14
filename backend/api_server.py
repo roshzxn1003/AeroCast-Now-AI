@@ -64,6 +64,7 @@ from district_nowcast_service import (
     find_district_by_query,
     generate_district_nowcast,
     get_national_district_summary,
+    generate_state_convective_report,
     DISTRICT_ALIASES,
 )
 
@@ -714,6 +715,20 @@ async def get_districts_by_state(state_slug: str):
     if not matches:
         raise HTTPException(status_code=404, detail=f"No districts found for state '{state_slug}'")
     return {"state": matches[0]["state"], "districts": matches, "count": len(matches)}
+
+
+@app.get("/api/v1/reports/state/{state_slug}")
+async def get_state_convective_report_endpoint(state_slug: str):
+    """
+    Comprehensive state-level convective intelligence report (38 districts for Tamil Nadu,
+    sector impacts on Aviation, Power Grid, Agriculture, and multilingual CAP advisories).
+    """
+    try:
+        return generate_state_convective_report(state_slug)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"State report generation failed: {exc}")
 
 
 @app.get("/api/live/nodes")

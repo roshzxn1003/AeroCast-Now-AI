@@ -9,7 +9,24 @@ import { ProceduralLightningManager } from '../effects/lightningGenerator';
 import { thunderAudio } from '../effects/thunderAudio';
 import { MAJOR_INDIAN_CITIES, CityPreset } from '../utils/weatherInterpreter';
 import { DistrictOverlay } from './DistrictOverlay';
-import { Volume2, VolumeX, Sun, Moon, ZoomIn, ZoomOut, Compass, Navigation } from 'lucide-react';
+import {
+  Volume2,
+  VolumeX,
+  Sun,
+  Moon,
+  ZoomIn,
+  ZoomOut,
+  Compass,
+  Navigation,
+  FileText,
+  RotateCw,
+  Maximize2,
+  Minimize2,
+  Zap,
+  Radio,
+  X,
+} from 'lucide-react';
+import { ProvenanceBadge } from './ui';
 
 /**
  * Deep, Photorealistic 3D Earth Globe with Procedural Lightning Simulation.
@@ -54,6 +71,7 @@ function homePov(el: HTMLElement | null) {
 
 const REGIONAL_PRESETS = [
   { id: 'all', label: 'All India', lat: 21.0, lng: 80.0, altitude: 1.65 },
+  { id: 'tamil-nadu', label: 'Tamil Nadu (38 Dists)', lat: 11.1271, lng: 78.6569, altitude: 0.48 },
   { id: 'south', label: 'South (Chennai/Blr)', lat: 13.0, lng: 79.5, altitude: 0.38 },
   { id: 'north', label: 'North (Delhi/NCR)', lat: 28.5, lng: 77.5, altitude: 0.38 },
   { id: 'west', label: 'West (Mumbai/Guj)', lat: 19.5, lng: 73.5, altitude: 0.38 },
@@ -76,13 +94,18 @@ const RIPPLE_MAX_AGE_S = 90;
 
 interface LightningGlobeProps {
   onNodeSelect?: (node: ConvectiveNode) => void;
+  onOpenStateReport?: (stateSlug: string) => void;
+  targetFocus?: { lat: number; lng: number; altitude?: number } | null;
   className?: string;
 }
 
 export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   onNodeSelect,
+  onOpenStateReport,
+  targetFocus,
   className,
 }) => {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const globeRef = useRef<GlobeInstance | null>(null);
   const lightningManagerRef = useRef<ProceduralLightningManager | null>(null);
@@ -93,13 +116,21 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   const [ready, setReady] = useState(false);
   const [hovered, setHovered] = useState<ConvectiveNode | null>(null);
   const [selectedCityInfo, setSelectedCityInfo] = useState<CityPreset | null>(null);
+  const [isAutoRotating, setIsAutoRotating] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activePresetId, setActivePresetId] = useState('all');
+
   // Held in a ref, not state: this is a comparison baseline for the thunder
   // trigger, and storing it in state made the strike effect re-enter itself.
   const lastStrikeCountRef = useRef(0);
 
+  const targetCloudOpacityRef = useRef(0.38);
+  const currentCloudOpacityRef = useRef(0.38);
+
   // Zustand stores
   const convective = useLiveStore((s) => s.convective);
   const lightning = useLiveStore((s) => s.lightning);
+  const summary = useLiveStore((s) => s.summary);
   const focusedNode = useLiveStore((s) => s.focusedNode);
   const setFocusedNode = useLiveStore((s) => s.setFocusedNode);
 
@@ -183,11 +214,8 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     const syncScale = (altitude: number) => {
       const scale = Math.min(1, Math.max(0.08, Math.sqrt(altitude / 1.2)));
 
-      // Drag speed. Deliberately well under 1: at the default the globe spins
-      // most of the way round in a single short drag, which reads as the map
-      // running away from the pointer rather than following it. Still scaled
-      // by altitude, so a close-in drag nudges rather than sweeps.
-      controls.rotateSpeed = Math.min(0.42, Math.max(0.07, 0.07 + altitude * 0.24));
+      // Drag speed: calm, slow, natural, and controlled. Prevents overshooting or jumping.
+      controls.rotateSpeed = Math.min(0.26, Math.max(0.12, 0.12 + altitude * 0.08));
 
       const band = Math.round(scale * 12);
       if (band === lastScaleBand) return;
@@ -213,15 +241,24 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     syncScale(initialPov.altitude);
 
     controls.autoRotate = false;
-    controls.autoRotateSpeed = 0.16;
+    controls.autoRotateSpeed = 0.22;
     controls.enableDamping = true;
-    // Higher than the previous 0.08: that let the globe coast for a long time
-    // after the pointer stopped, so it kept drifting past the intended target.
-    controls.dampingFactor = 0.16;
-    // Finer wheel steps -- one notch used to cross several zoom levels.
-    controls.zoomSpeed = 0.55;
-    controls.minDistance = 101.5; // Surface is radius 100 — allows ultra-close city zoom!
+    controls.dampingFactor = 0.14; // Buttery-smooth, tactile rotation
+    controls.zoomSpeed = 0.40;     // Gentle, controlled scroll wheel steps
+    controls.minDistance = 101.5;  // Surface is radius 100 — allows ultra-close city zoom!
     controls.maxDistance = 650;
+
+    // Double-click to smoothly zoom into clicked coordinates
+    const onDblClick = (ev: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      const coords = globe.toGlobeCoords(ev.clientX - rect.left, ev.clientY - rect.top);
+      if (coords) {
+        const current = globe.pointOfView();
+        const targetAlt = Math.max(0.18, current.altitude * 0.65);
+        globe.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: targetAlt }, 800);
+      }
+    };
+    el.addEventListener('dblclick', onDblClick);
 
     // Unrestricted orbit: the camera may travel over either pole and all the
     // way around, so any point on Earth can be brought into view by dragging
@@ -296,9 +333,11 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     // -------------------------------------------------------------------------
     // 4. Animation Loop for Lightning Flickers & Cloud Rotation
     // -------------------------------------------------------------------------
-    const baseCloudOpacity = earthTheme === 'night' ? 0.45 : 0.72;
-
     const animate = () => {
+      // Smoothly interpolate cloud opacity towards target theme opacity
+      currentCloudOpacityRef.current +=
+        (targetCloudOpacityRef.current - currentCloudOpacityRef.current) * 0.06;
+
       const clouds = cloudsMeshRef.current;
       if (clouds) {
         clouds.rotation.y += 0.00018; // Slow atmospheric cloud drift
@@ -308,7 +347,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
           0,
           Math.min(1, (altitude - CLOUD_FADE_END) / (CLOUD_FADE_START - CLOUD_FADE_END)),
         );
-        (clouds.material as THREE.MeshPhongMaterial).opacity = baseCloudOpacity * t;
+        (clouds.material as THREE.MeshPhongMaterial).opacity = currentCloudOpacityRef.current * t;
         clouds.visible = t > 0.01;
       }
       lightningManagerRef.current?.update();
@@ -391,6 +430,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
 
     return () => {
       cancelled = true;
+      el.removeEventListener('dblclick', onDblClick);
       cloudsMeshRef.current = null;
       observer.disconnect();
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -403,7 +443,21 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
       globe._destructor?.();
       globeRef.current = null;
     };
-  }, [earthTheme]);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Dynamic Earth Theme Synchronization (Smooth transition without reload)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe || !ready) return;
+    targetCloudOpacityRef.current = earthTheme === 'night' ? 0.38 : 0.70;
+    const globeImage =
+      earthTheme === 'night' ? '/textures/earth-night.jpg' : '/textures/earth-blue-marble.jpg';
+    globe.globeImageUrl(globeImage);
+    globe.atmosphereColor(earthTheme === 'night' ? '#38bdf8' : '#60a5fa');
+    globe.atmosphereAltitude(earthTheme === 'night' ? 0.14 : 0.18);
+  }, [earthTheme, ready]);
 
   // ---------------------------------------------------------------------------
   // 6. Real-Time Procedural Lightning Discharge & Thunder Audio Sync
@@ -573,6 +627,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   // ---------------------------------------------------------------------------
 
   const flyToRegion = useCallback((preset: typeof REGIONAL_PRESETS[0]) => {
+    setActivePresetId(preset.id);
     globeRef.current?.pointOfView({ lat: preset.lat, lng: preset.lng, altitude: preset.altitude }, 1200);
     setSelectedCityInfo(null);
   }, []);
@@ -587,10 +642,46 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   }, []);
 
   const resetView = useCallback(() => {
+    setActivePresetId('all');
     globeRef.current?.pointOfView(homePov(containerRef.current), 1000);
     setFocusedNode(null);
     setSelectedCityInfo(null);
   }, [setFocusedNode]);
+
+  useEffect(() => {
+    if (ready && globeRef.current && targetFocus) {
+      globeRef.current.pointOfView(
+        { lat: targetFocus.lat, lng: targetFocus.lng, altitude: targetFocus.altitude ?? 0.16 },
+        1400
+      );
+    }
+  }, [ready, targetFocus]);
+
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    const controls = globe.controls() as any;
+    if (controls) {
+      controls.autoRotate = isAutoRotating;
+      controls.autoRotateSpeed = 0.22;
+    }
+  }, [isAutoRotating]);
+
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      wrapperRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
 
   const toggleSound = useCallback(() => {
     const next = !soundEnabled;
@@ -603,11 +694,7 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   }, [soundEnabled, setSoundEnabled]);
 
   return (
-    // Positioning comes from the caller's className. An inline position:relative
-    // here silently overrode the `absolute inset-0` it is given, so the root
-    // never matched its container and the canvas was sized against the wrong
-    // box — leaving the globe rendered partly outside the visible pane.
-    <div className={className}>
+    <div ref={wrapperRef} className={className}>
       <div
         ref={containerRef}
         className="absolute inset-0"
@@ -616,26 +703,106 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         aria-label="Interactive 3D Convective Earth Globe with Procedural Lightning"
       />
 
-      {/* District layer. Owns its own meshes, labels and pointer handling, and
-          deliberately uses none of globe.gl's layer accessors — those are all
-          claimed above and are setters, not subscriptions. */}
+      {/* District layer: boundaries, live choropleth, search, detail panel & unified legend */}
       <DistrictOverlay
         globe={ready ? globeRef.current : null}
         container={containerRef.current}
       />
 
-      {/* Hovered Sounding Node Tooltip (Positioned beside top-left Strike HUD without overlap) */}
+      {/* ------------------------------------------------ Top Command Bar Dock */}
+      <div className="absolute top-3 inset-x-3 z-30 flex items-center justify-between gap-2.5 pointer-events-none">
+        {/* Left: Live Convective Strike Monitor */}
+        <div className="pointer-events-auto flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 shadow-xl backdrop-blur-md">
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono text-base sm:text-lg font-bold leading-none text-amber-300">
+              {(summary?.strike_count_30min ?? 0).toLocaleString()}
+            </span>
+            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 hidden xs:inline">
+              Flashes / 30m
+            </span>
+          </div>
+          {lightning?.status && <ProvenanceBadge provenance={lightning.status} className="hidden sm:inline-flex" />}
+        </div>
+
+        {/* Center spacing reserve for DistrictSearch (rendered in DistrictOverlay) */}
+        <div className="flex-1 max-w-sm pointer-events-none" />
+
+        {/* Right: Mission Control Cluster */}
+        <div className="pointer-events-auto flex items-center gap-1.5">
+          <button
+            onClick={() => onOpenStateReport?.('tamil-nadu')}
+            title="Tamil Nadu 38-District Convective Intelligence & Warning Hub"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-cyan-950/90 border border-cyan-500/50 text-cyan-300 hover:text-white hover:bg-cyan-900/90 shadow-lg backdrop-blur-md transition-all font-mono text-xs font-bold tracking-wider hover:border-cyan-400"
+          >
+            <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span className="hidden sm:inline">TN HUB</span>
+          </button>
+
+          <button
+            onClick={() => setEarthTheme(earthTheme === 'night' ? 'day' : 'night')}
+            title={`Switch to ${earthTheme === 'night' ? 'Daylight Marble' : 'Night Lights'} Texture`}
+            className="p-1.5 sm:p-2 rounded-xl bg-slate-900/90 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/90 shadow-lg backdrop-blur-md transition-all"
+          >
+            {earthTheme === 'night' ? (
+              <Moon className="w-3.5 h-3.5 text-cyan-400" />
+            ) : (
+              <Sun className="w-3.5 h-3.5 text-amber-400" />
+            )}
+          </button>
+
+          <button
+            onClick={toggleSound}
+            title={soundEnabled ? 'Mute Thunder Audio' : 'Enable Rolling Thunder Audio'}
+            className={`p-1.5 sm:p-2 rounded-xl border shadow-lg backdrop-blur-md transition-all ${
+              soundEnabled
+                ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-300 shadow-cyan-950/50'
+                : 'bg-slate-900/90 border-white/10 text-slate-400 hover:text-white hover:bg-slate-800/90'
+            }`}
+          >
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> : <VolumeX className="w-3.5 h-3.5" />}
+          </button>
+
+          <button
+            onClick={() => setIsAutoRotating((v) => !v)}
+            title={isAutoRotating ? 'Pause Orbit' : 'Auto-Rotate Earth'}
+            className={`p-1.5 sm:p-2 rounded-xl border shadow-lg backdrop-blur-md transition-all ${
+              isAutoRotating
+                ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-300 shadow-cyan-950/50'
+                : 'bg-slate-900/90 border-white/10 text-slate-400 hover:text-white hover:bg-slate-800/90'
+            }`}
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isAutoRotating ? 'animate-spin' : ''}`} style={{ animationDuration: '6s' }} />
+          </button>
+
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Globe View'}
+            className="p-1.5 sm:p-2 rounded-xl bg-slate-900/90 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/90 shadow-lg backdrop-blur-md transition-all"
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* -------------------------------------- Hovered Sounding Node Tooltip HUD */}
       {hovered && (
         <div
-          className="absolute top-20 sm:top-4 left-4 sm:left-[220px] z-20 pointer-events-none panel px-3.5 py-2 enter backdrop-blur-md rounded-xl shadow-xl"
-          style={{ background: 'rgba(11, 15, 20, 0.94)', border: '1px solid rgba(56, 189, 248, 0.35)' }}
+          className="absolute top-[4.25rem] left-1/2 -translate-x-1/2 z-25 pointer-events-none flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/95 border border-cyan-500/40 shadow-2xl backdrop-blur-md enter whitespace-nowrap"
         >
-          <div className="text-[12px] font-bold text-white flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-white">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: severityColor(hovered.instability) }} />
             <span>{hovered.name}</span>
             <span className="text-[10px] text-slate-400 font-normal">({hovered.region})</span>
           </div>
-          <div className="mt-1 flex items-center gap-2.5 font-mono text-[11px]">
+          <span className="text-slate-600">|</span>
+          <div className="flex items-center gap-2 font-mono text-[11px]">
             <span style={{ color: severityColor(hovered.instability) }}>
               {hovered.instability}
             </span>
@@ -645,9 +812,9 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         </div>
       )}
 
-      {/* Selected City Inspector Card (Positioned cleanly beside Strike HUD with zero collision) */}
+      {/* ---------------------------------------- Selected City Radar Inspector */}
       {selectedCityInfo && (
-        <div className="absolute top-20 sm:top-4 left-4 sm:left-[220px] z-20 panel p-3.5 enter backdrop-blur-md max-w-xs bg-slate-900/95 border border-cyan-500/50 shadow-2xl rounded-xl">
+        <div className="absolute top-16 left-3 z-30 panel p-3.5 enter backdrop-blur-md max-w-xs bg-slate-900/95 border border-cyan-500/50 shadow-2xl rounded-2xl">
           <div className="flex items-start justify-between">
             <div>
               <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
@@ -659,10 +826,10 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
             </div>
             <button
               onClick={() => setSelectedCityInfo(null)}
-              className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition-colors ml-2"
+              className="text-slate-400 hover:text-white text-xs p-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors ml-2"
               title="Close inspection"
             >
-              ✕
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
           <div className="mt-2.5 pt-2 border-t border-slate-800 text-[11px] text-slate-300 space-y-1">
@@ -682,71 +849,55 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         </div>
       )}
 
-      {/* Floating Top-Right Controls: Audio & Day/Night Toggle */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        <button
-          onClick={toggleSound}
-          title={soundEnabled ? 'Mute Thunder Audio' : 'Enable Rolling Thunder Audio'}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-lg backdrop-blur-md border ${
-            soundEnabled
-              ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-300 shadow-cyan-950/50 animate-pulse'
-              : 'bg-slate-900/80 border-slate-700/60 text-slate-400 hover:text-white'
-          }`}
-        >
-          {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> : <VolumeX className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">
-            {soundEnabled ? 'THUNDER AUDIO: ON' : 'SOUND: MUTED'}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setEarthTheme(earthTheme === 'night' ? 'day' : 'night')}
-          title="Toggle Earth Day / Night Texture"
-          className="p-2 rounded-lg bg-slate-900/80 border border-slate-700/60 text-slate-300 hover:text-white shadow-lg backdrop-blur-md transition-colors"
-        >
-          {earthTheme === 'night' ? <Moon className="w-3.5 h-3.5 text-cyan-400" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
-        </button>
-      </div>
-
-      {/* Floating Bottom-Center Region Quick-Nav HUD */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-700/70 shadow-2xl backdrop-blur-md max-w-[calc(100%-2rem)] overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-1 px-1">
+      {/* ------------------------------------------- Bottom-Center Regional HUD */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden md:flex items-center gap-1 p-1 rounded-2xl bg-slate-900/90 border border-white/10 shadow-2xl backdrop-blur-md">
+        <div className="flex items-center gap-1 pl-2 pr-1">
           <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">
-            Zoom India:
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            Quick Nav:
           </span>
         </div>
-        {REGIONAL_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            onClick={() => flyToRegion(preset)}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap shrink-0 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            {preset.label}
-          </button>
-        ))}
+        {REGIONAL_PRESETS.map((preset) => {
+          const isActive = activePresetId === preset.id;
+          return (
+            <button
+              key={preset.id}
+              onClick={() => {
+                setActivePresetId(preset.id);
+                flyToRegion(preset);
+              }}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-medium whitespace-nowrap shrink-0 transition-all ${
+                isActive
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent'
+              }`}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Floating Bottom-Right Camera Navigation Controls */}
+      {/* ------------------------------------------- Bottom-Right Camera Navigation */}
       <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-1.5">
         <button
           onClick={() => handleZoom('in')}
-          title="Zoom In"
-          className="w-8 h-8 rounded-lg bg-slate-900/90 border border-slate-700/70 text-slate-300 hover:text-white grid place-items-center shadow-lg backdrop-blur-md transition-colors"
+          title="Zoom In (+)"
+          className="w-8 h-8 rounded-xl bg-slate-900/90 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/90 grid place-items-center shadow-lg backdrop-blur-md transition-all hover:border-cyan-500/40"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
         <button
           onClick={() => handleZoom('out')}
-          title="Zoom Out"
-          className="w-8 h-8 rounded-lg bg-slate-900/90 border border-slate-700/70 text-slate-300 hover:text-white grid place-items-center shadow-lg backdrop-blur-md transition-colors"
+          title="Zoom Out (-)"
+          className="w-8 h-8 rounded-xl bg-slate-900/90 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/90 grid place-items-center shadow-lg backdrop-blur-md transition-all hover:border-cyan-500/40"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
         <button
           onClick={resetView}
           title="Reset to All India View"
-          className="w-8 h-8 rounded-lg bg-slate-900/90 border border-slate-700/70 text-slate-300 hover:text-cyan-400 grid place-items-center shadow-lg backdrop-blur-md transition-colors"
+          className="w-8 h-8 rounded-xl bg-slate-900/90 border border-white/10 text-slate-300 hover:text-cyan-400 hover:bg-slate-800/90 grid place-items-center shadow-lg backdrop-blur-md transition-all hover:border-cyan-500/40"
         >
           <Compass className="w-4 h-4" />
         </button>

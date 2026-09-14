@@ -579,3 +579,378 @@ def get_national_district_summary(limit: int = 50) -> Dict[str, Any]:
         },
         "districts": monitored_districts,
     }
+
+
+def generate_state_convective_report(state_slug: str) -> Dict[str, Any]:
+    """
+    Generates a comprehensive regional convective intelligence report for any Indian
+    state/UT (with special high-fidelity sector impact models for Tamil Nadu's 38 districts).
+    Aggregates telemetry across all districts of the state, sector risks (Aviation,
+    Power Grid, Agriculture, Marine/Ports, Urban Waterlogging), and multilingual
+    disaster management advisories (English, Tamil, Hindi).
+    """
+    districts = load_districts_gazetteer()
+    clean_slug = state_slug.strip().lower().replace("_", " ").replace("-", " ")
+
+    if clean_slug in ("tamilnadu", "tn", "tamil nadu"):
+        target_state = "tamil nadu"
+    else:
+        target_state = clean_slug
+
+    matches = [
+        d for d in districts
+        if target_state in d["state"].lower() or d["state"].lower() in target_state
+    ]
+    if not matches:
+        raise ValueError(f"No districts found matching state query '{state_slug}'")
+
+    canonical_state = matches[0]["state"]
+    convective = fetch_live_convective()
+    live_nodes = convective.get("nodes", [])
+
+    # Retrieve live lightning strikes
+    try:
+        strike_field = get_lightning_field(window_minutes=30)
+        all_strikes = strike_field.get("strikes", [])
+    except Exception:
+        all_strikes = []
+
+    # Calculate geographic bounds and centroid of state
+    lats = [d["lat"] for d in matches]
+    lons = [d["lon"] for d in matches]
+    min_lat, max_lat = min(lats) - 0.25, max(lats) + 0.25
+    min_lon, max_lon = min(lons) - 0.25, max(lons) + 0.25
+    center_lat = sum(lats) / len(lats)
+    center_lon = sum(lons) / len(lons)
+
+    # Filter strikes within the state bounding box
+    state_strikes = [
+        s for s in all_strikes
+        if min_lat <= s.get("lat", 0) <= max_lat and min_lon <= s.get("lon", 0) <= max_lon
+    ]
+    state_strike_count = len(state_strikes)
+
+    # Nearest radar station
+    best_station_name, best_station_info, _ = find_nearest_radar_station(center_lat, center_lon)
+
+    district_results = []
+    extreme_count = 0
+    severe_count = 0
+    moderate_count = 0
+    stable_count = 0
+    peak_dbz = 0.0
+    max_cape = 0.0
+
+    for d in matches:
+        min_node_dist = float("inf")
+        nearest_node = None
+        for n in live_nodes:
+            dist = haversine_distance_km(d["lat"], d["lon"], n["lat"], n["lon"])
+            if dist < min_node_dist:
+                min_node_dist = dist
+                nearest_node = n
+
+        intensity = nearest_node.get("intensity", 0.1) if nearest_node else 0.1
+        cape = nearest_node.get("cape_j_kg", 1200.0) if nearest_node else 1200.0
+
+        sim_dbz = round(intensity * 60.0, 1)
+        sim_vil = round(intensity * 35.0, 1)
+        threat, color = classify_threat_level(sim_dbz, sim_vil, -20.0, intensity * 20.0)
+
+        peak_dbz = max(peak_dbz, sim_dbz)
+        max_cape = max(max_cape, cape)
+
+        if threat == "EXTREME":
+            extreme_count += 1
+        elif threat == "SEVERE":
+            severe_count += 1
+        elif threat == "MODERATE":
+            moderate_count += 1
+        else:
+            stable_count += 1
+
+        wind_gust = round(28.0 + intensity * 62.0, 1)
+        eta_min = max(15, int(min_node_dist / 1.1)) if min_node_dist < 100 else None
+
+        district_results.append({
+            "id": d["id"],
+            "name": d["name"],
+            "state": d["state"],
+            "threat_level": threat,
+            "threat_color": color,
+            "max_reflectivity_dbz": sim_dbz,
+            "vil_kg_m2": sim_vil,
+            "cape_j_kg": cape,
+            "wind_gust_kmh": wind_gust,
+            "eta_minutes": eta_min,
+            "distance_to_core_km": round(min_node_dist, 1) if min_node_dist < 300 else None,
+            "lat": d["lat"],
+            "lon": d["lon"],
+            "bbox": d.get("bbox", []),
+        })
+
+    # Sort districts by threat priority then peak dBZ descending
+    threat_order = {"EXTREME": 0, "SEVERE": 1, "MODERATE": 2, "LOW": 3, "STABLE": 4}
+    district_results.sort(
+        key=lambda x: (threat_order.get(x["threat_level"], 5), -x["max_reflectivity_dbz"], x["name"])
+    )
+
+    if extreme_count > 0:
+        overall_threat = "EXTREME"
+        overall_color = "#ef4444"
+    elif severe_count > 0:
+        overall_threat = "SEVERE"
+        overall_color = "#f97316"
+    elif moderate_count > 0:
+        overall_threat = "MODERATE"
+        overall_color = "#eab308"
+    else:
+        overall_threat = "STABLE"
+        overall_color = "#10b981"
+
+    is_tamil_nadu = "tamil nadu" in canonical_state.lower()
+    d_map = {d["name"].lower(): d for d in district_results}
+
+    if is_tamil_nadu:
+        chennai_d = d_map.get("chennai") or d_map.get("thiruvallur")
+        coimbatore_d = d_map.get("coimbatore")
+        madurai_d = d_map.get("madurai")
+        trichy_d = d_map.get("tiruchirappalli")
+
+        def _airport_status(d_entry: Optional[Dict[str, Any]], name: str, code: str):
+            threat = d_entry["threat_level"] if d_entry else "STABLE"
+            dbz = d_entry["max_reflectivity_dbz"] if d_entry else 15.0
+            gust = d_entry["wind_gust_kmh"] if d_entry else 25.0
+            if threat in ("EXTREME", "SEVERE"):
+                status = "GROUND_STOP_ALERT"
+                color = "#ef4444"
+                advisory = "High probability of low-level wind shear (>25 kt) and microburst near runways. Terminal holding likely."
+            elif threat == "MODERATE":
+                status = "CAUTION_HOLDING"
+                color = "#eab308"
+                advisory = "Convective cells within terminal control area. Vectoring delays anticipated (15–30 min)."
+            else:
+                status = "NORMAL_OPS"
+                color = "#10b981"
+                advisory = "Visual flight rules / standard instrument departures unrestricted. Clear approach corridor."
+            return {
+                "airport": name,
+                "iata": code,
+                "status": status,
+                "color": color,
+                "threat_level": threat,
+                "reflectivity_dbz": dbz,
+                "wind_gust_kmh": gust,
+                "advisory": advisory,
+            }
+
+        aviation = [
+            _airport_status(chennai_d, "Chennai International Airport", "MAA"),
+            _airport_status(coimbatore_d, "Coimbatore International Airport", "CJB"),
+            _airport_status(madurai_d, "Madurai Airport", "IXM"),
+            _airport_status(trichy_d, "Tiruchirappalli International Airport", "TRZ"),
+        ]
+
+        if overall_threat in ("EXTREME", "SEVERE"):
+            grid_risk = "CRITICAL"
+            grid_color = "#ef4444"
+            grid_trip_prob = min(88, int(35 + peak_dbz * 0.8))
+            grid_desc = "TANGEDCO 400kV/230kV transmission corridors under high lightning surge risk. Surge arrestor duty elevated; trip risk in northern & central circles."
+        elif overall_threat == "MODERATE":
+            grid_risk = "ELEVATED"
+            grid_color = "#eab308"
+            grid_trip_prob = 32
+            grid_desc = "Isolated feeder tripping possible on 110kV/33kV distribution lines due to lightning strikes and branch-fall line faults."
+        else:
+            grid_risk = "NOMINAL"
+            grid_color = "#10b981"
+            grid_trip_prob = 5
+            grid_desc = "Normal grid dispatch and substation power transmission across all TANGEDCO operational circles."
+
+        delta_districts = ["thanjavur", "thiruvarur", "mayiladuthurai", "nagapattinam"]
+        delta_threats = [d_map[k]["threat_level"] for k in delta_districts if k in d_map]
+        has_delta_threat = any(t in ("EXTREME", "SEVERE", "MODERATE") for t in delta_threats)
+
+        agri_risk = "HIGH_ALERT" if has_delta_threat else ("ADVISORY" if overall_threat == "MODERATE" else "FAVORABLE")
+        agri_desc = (
+            "Cauvery Delta samba/thaladi paddy belt susceptible to localized lodging from squall winds (>45 km/h) and standing water inundation."
+            if has_delta_threat
+            else "Standard seasonal moisture profile; agricultural operations proceeding normally without severe storm impact."
+        )
+
+        coastal_threat = any(
+            d_map.get(k, {}).get("threat_level") in ("EXTREME", "SEVERE", "MODERATE")
+            for k in ["chennai", "cuddalore", "nagapattinam", "thoothukkudi", "ramanathapuram"]
+        )
+        marine_risk = "SQUALL_WARNING" if coastal_threat else "CALM_SEAS"
+        marine_desc = (
+            "Squall wind speed reaching 45–55 km/h gusting to 65 km/h likely along Tamil Nadu coast, Palk Strait, and Gulf of Mannar. Fishermen advised not to venture into open seas."
+            if coastal_threat
+            else "Wave heights 0.8m–1.4m. Port operations at Ennore, Chennai, and VO Chidambaranar running normally."
+        )
+
+        urban_waterlogging = "CRITICAL" if chennai_d and chennai_d["threat_level"] in ("EXTREME", "SEVERE") else ("WATCH" if chennai_d and chennai_d["threat_level"] == "MODERATE" else "NORMAL")
+        urban_desc = (
+            "High micro-cell precipitation rate over Chennai Metropolitan Area. Surcharge potential for Adyar, Cooum basins and low-lying subways."
+            if urban_waterlogging != "NORMAL"
+            else "Normal stormwater disposal. No significant localized waterlogging expected."
+        )
+
+        sector_impacts = {
+            "aviation": aviation,
+            "power_grid": {
+                "authority": "TANGEDCO (Tamil Nadu Generation and Distribution Corporation)",
+                "risk_level": grid_risk,
+                "risk_color": grid_color,
+                "trip_probability_pct": grid_trip_prob,
+                "description": grid_desc,
+            },
+            "agriculture": {
+                "zone": "Cauvery Delta & Western Agro-Climatic Zones",
+                "risk_level": agri_risk,
+                "description": agri_desc,
+            },
+            "marine_and_ports": {
+                "coastal_stretch": "Coromandel Coast, Palk Bay & Gulf of Mannar",
+                "risk_level": marine_risk,
+                "description": marine_desc,
+            },
+            "urban_drainage": {
+                "focus_area": "Chennai Metropolitan Area & Madurai Urban Core",
+                "risk_level": urban_waterlogging,
+                "description": urban_desc,
+            }
+        }
+
+        if overall_threat in ("EXTREME", "SEVERE"):
+            advisory = {
+                "en": (
+                    f"SEVERE THUNDERSTORM & LIGHTNING WARNING for Tamil Nadu. Convective cells actively tracking across "
+                    f"multiple districts with peak reflectivity of {peak_dbz} dBZ and CAPE soundings exceeding {int(max_cape)} J/kg. "
+                    f"High risk of cloud-to-ground lightning discharges, sudden squally winds (55–75 km/h), and localized flash flooding. "
+                    f"Public Advisory: Remain indoors; immediately disconnect non-essential electronic appliances; stay away from open farmland, "
+                    f"waterbodies, and metal towers. Fishermen in Palk Strait and Gulf of Mannar must remain in port."
+                ),
+                "ta": (
+                    f"தீவிர இடி மின்னல் மற்றும் பலத்த காற்று எச்சரிக்கை (தமிழ்நாடு): மாநிலத்தின் பல்வேறு மாவட்டங்களில் "
+                    f"வளிமண்டல மேலடுக்கு சுழற்சி காரணமாக தீவிர இடி மேகங்கள் உருவாகி வருகின்றன (உச்சபட்ச ரேடார் எதிரொலிப்பு {peak_dbz} dBZ, "
+                    f"CAPE ஆற்றல் {int(max_cape)} J/kg). அடுத்த 1–2 மணி நேரத்திற்கு மணிக்கு 55–75 கி.மீ வேகத்தில் பலத்த காற்றுடன் கூடிய கனமழை "
+                    f"மற்றும் சக்திவாய்ந்த இடி மின்னல் தாக்க வாய்ப்புள்ளது. பொதுமக்கள் திறந்தவெளிகள், உயரமான மரங்கள், விளம்பரப் பலகைகள் மற்றும் "
+                    f"மின்கம்பங்கள் அருகே நிற்பதைத் தவிர்க்கவும். விவசாயிகள் களப்பணிகளை உடனடியாக நிறுத்தி பாதுகாப்பான இடங்களில் தஞ்சம் அடையுமாறு "
+                    f"கேட்டுக்கொள்ளப்படுகிறார்கள்."
+                ),
+                "hi": (
+                    f"तमिलनाडु के लिए भीषण मेघगर्जन एवं आकाशीय बिजली की चेतावनी: राज्य के कई जिलों में तीव्र गरज-चमक वाले बादलों का जमावड़ा देखा गया है "
+                    f"(अधिकतम रडार परावर्तन {peak_dbz} dBZ, CAPE {int(max_cape)} J/kg)। अगले 1–2 घंटों में 55–75 किमी/घंटा की तूफानी हवाओं और "
+                    f"आकाशीय बिजली गिरने का प्रबल खतरा है। सभी नागरिक पक्के मकानों में शरण लें, पेड़ों और बिजली के खंभों से दूर रहें तथा खेतों में काम तुरंत बंद करें।"
+                ),
+            }
+        elif overall_threat == "MODERATE":
+            advisory = {
+                "en": (
+                    f"THUNDERSTORM WATCH for Tamil Nadu. Moderate convective cells detected across several districts with reflectivity "
+                    f"up to {peak_dbz} dBZ. Intermittent lightning activity and gusty winds up to 45 km/h expected. Agricultural workers "
+                    f"and commuters should observe precautionary measures."
+                ),
+                "ta": (
+                    f"இடி மின்னல் கண்காணிப்பு அறிக்கை (தமிழ்நாடு): மாநிலத்தின் சில பகுதிகளில் மிதமான இடி மேகங்கள் பதிவாகியுள்ளன "
+                    f"(ரேடார் எதிரொலிப்பு {peak_dbz} dBZ வரை). மணிக்கு 45 கி.மீ வேகத்தில் காற்று வீசக்கூடும் மற்றும் ஆங்காங்கே இடி மின்னலுடன் "
+                    f"மழை பெய்ய வாய்ப்புள்ளது. பொதுமக்கள் மற்றும் விவசாயிகள் அவசியமான முன்னெச்சரிக்கை நடவடிக்கைகளை மேற்கொள்ளுமாறு அறிவுறுத்தப்படுகிறார்கள்."
+                ),
+                "hi": (
+                    f"तमिलनाडु के लिए मौसम निगरानी चेतावनी: राज्य के कुछ हिस्सों में मध्यम गरज-चमक वाले बादल सक्रिय हैं "
+                    f"(रडार परावर्तन {peak_dbz} dBZ तक)। 45 किमी/घंटा तक तेज हवाओं और छिटपुट बिजली चमकने की संभावना है। सावधानी बरतने की सलाह दी जाती है।"
+                ),
+            }
+        else:
+            advisory = {
+                "en": (
+                    f"ROUTINE METEOROLOGICAL BULLETIN: Stable atmospheric conditions prevailing across Tamil Nadu's 38 districts. "
+                    f"Convective instability remains low (CAPE < 1500 J/kg, max dBZ < 30). Standard operational protocols in effect."
+                ),
+                "ta": (
+                    f"வழக்கமான வானிலை தகவல்: தமிழ்நாட்டின் 38 மாவட்டங்களிலும் வளிமண்டல நிலை தற்போது இயல்பாகவும் சீராகவும் உள்ளது. "
+                    f"உடனடி தீவிர புயல் அல்லது இடி மின்னல் அச்சுறுத்தல் எதுவும் இல்லை. வழக்கமான பணிகள் தொடரலாம்."
+                ),
+                "hi": (
+                    f"दैनिक मौसम बुलेटिन: तमिलनाडु के सभी 38 जिलों में वायुमंडलीय स्थिति स्थिर और सामान्य है। "
+                    f"मेघगर्जन या आकाशीय बिजली का कोई तात्कालिक खतरा नहीं है।"
+                ),
+            }
+    else:
+        sector_impacts = {
+            "aviation": [],
+            "power_grid": {
+                "authority": f"State Electricity Transmission Utility ({canonical_state})",
+                "risk_level": overall_threat,
+                "risk_color": overall_color,
+                "trip_probability_pct": 25 if overall_threat in ("EXTREME", "SEVERE") else 8,
+                "description": f"Grid operations monitored for {canonical_state} transmission circles.",
+            },
+            "agriculture": {
+                "zone": f"{canonical_state} Agricultural Belts",
+                "risk_level": overall_threat,
+                "description": f"Crop impact advisory for {canonical_state}.",
+            },
+            "marine_and_ports": {
+                "coastal_stretch": f"{canonical_state} Regional Waters",
+                "risk_level": "NORMAL",
+                "description": "Inland or standard maritime conditions.",
+            },
+            "urban_drainage": {
+                "focus_area": f"{canonical_state} Urban Centers",
+                "risk_level": overall_threat,
+                "description": f"Stormwater handling index across major municipalities.",
+            }
+        }
+        advisory = {
+            "en": f"Convective weather report for {canonical_state}: Current threat is {overall_threat} (Peak dBZ: {peak_dbz}).",
+            "ta": f"{canonical_state} மாநிலத்திற்கான வானிலை அறிக்கை: தற்போதைய அச்சுறுத்தல் {overall_threat}.",
+            "hi": f"{canonical_state} के लिए संवहनी मौसम रिपोर्ट: वर्तमान खतरा {overall_threat} (अधिकतम dBZ: {peak_dbz})।"
+        }
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return {
+        "state": canonical_state,
+        "state_slug": state_slug,
+        "timestamp": now_iso,
+        "summary": {
+            "districts_monitored": len(district_results),
+            "highest_threat": overall_threat,
+            "highest_threat_color": overall_color,
+            "peak_reflectivity_dbz": peak_dbz,
+            "max_cape_j_kg": max_cape,
+            "active_lightning_strikes": state_strike_count,
+            "extreme_count": extreme_count,
+            "severe_count": severe_count,
+            "moderate_count": moderate_count,
+            "stable_count": stable_count,
+            "nearest_radar_station": best_station_name,
+            "camera_center": {
+                "lat": 11.1271 if is_tamil_nadu else round(center_lat, 4),
+                "lng": 78.6569 if is_tamil_nadu else round(center_lon, 4),
+                "altitude": 0.48,
+            }
+        },
+        "districts": district_results,
+        "sector_impacts": sector_impacts,
+        "advisory": advisory,
+        "cap_bulletin": {
+            "identifier": f"IN-IMD-CAP-{state_slug.upper().replace('-', '_')}-{int(datetime.now(timezone.utc).timestamp())}",
+            "sender": "AeroCast-Nowcast-HQ@imd.gov.in",
+            "sent": now_iso,
+            "status": "Actual",
+            "msgType": "Alert" if overall_threat in ("EXTREME", "SEVERE") else ("Update" if overall_threat == "MODERATE" else "Routine"),
+            "scope": "Public",
+            "category": "Met",
+            "urgency": "Immediate" if overall_threat == "EXTREME" else ("Expected" if overall_threat == "SEVERE" else "Future"),
+            "severity": "Extreme" if overall_threat == "EXTREME" else ("Severe" if overall_threat == "SEVERE" else "Moderate"),
+            "certainty": "Observed" if overall_threat in ("EXTREME", "SEVERE") else "Likely",
+            "event": f"Convective Thunderstorm / Lightning Warning ({canonical_state})",
+            "headline": f"Regional Convective Weather Bulletin for {canonical_state}: {overall_threat} Threat Detected",
+            "description": advisory["en"],
+            "instruction": "Follow local State Disaster Management Authority (TNSDMA) guidelines. Stay away from trees, open fields, and waterbodies.",
+            "areaDesc": f"{canonical_state} ({len(district_results)} Districts)",
+        }
+    }
+

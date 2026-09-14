@@ -43,7 +43,7 @@ const HIGHLIGHT_ALTITUDE = 0.0095;
  * over the state outlines; below it the user has committed to a region and the
  * districts become the useful unit.
  */
-export const BORDER_VISIBLE_ALTITUDE = 1.05;
+export const BORDER_VISIBLE_ALTITUDE = 1.85;
 
 /**
  * Camera altitude below which district name labels appear.
@@ -57,7 +57,7 @@ const LABEL_VISIBLE_ALTITUDE = 0.7;
 const MAX_LABELS = 45;
 
 /** Pointer travel, in px, above which a pointerup is a drag and not a click. */
-const CLICK_SLOP_PX = 5;
+const CLICK_SLOP_PX = 8;
 
 export interface DistrictLayerOptions {
   onHover?: (district: District | null) => void;
@@ -553,49 +553,83 @@ export async function attachDistrictLayer(
   let hoverFrame: number | null = null;
   let pointerEvent: PointerEvent | null = null;
 
+  let isDragging = false;
+  let downAt: { x: number; y: number } | null = null;
+
+  const onPointerDown = (ev: PointerEvent) => {
+    downAt = { x: ev.clientX, y: ev.clientY };
+    isDragging = false;
+    container.style.cursor = 'grabbing';
+  };
+
   const onPointerMove = (ev: PointerEvent) => {
-    if (!layerVisible || lastAltitude >= BORDER_VISIBLE_ALTITUDE) {
-      if (hoveredId) setHovered(null);
+    if (downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > CLICK_SLOP_PX) {
+      isDragging = true;
+      container.style.cursor = 'grabbing';
+      if (hoveredId) {
+        setHovered(null);
+        options.onHover?.(null);
+      }
       return;
     }
+
+    if (isDragging) {
+      container.style.cursor = 'grabbing';
+      return;
+    }
+
+    if (!layerVisible || lastAltitude > 2.0) {
+      if (hoveredId) {
+        setHovered(null);
+        options.onHover?.(null);
+      }
+      container.style.cursor = 'grab';
+      return;
+    }
+
     pointerEvent = ev;
     if (hoverFrame != null) return;
     hoverFrame = requestAnimationFrame(() => {
       hoverFrame = null;
-      if (!pointerEvent) return;
+      if (!pointerEvent || isDragging) return;
       const hit = districtAtPointer(pointerEvent);
       if ((hit?.id ?? null) !== hoveredId) {
         setHovered(hit?.id ?? null);
         options.onHover?.(hit ?? null);
       }
+      container.style.cursor = hit ? 'pointer' : 'grab';
     });
   };
 
   const onPointerLeave = () => {
+    downAt = null;
+    isDragging = false;
+    container.style.cursor = 'grab';
     if (hoveredId) {
       setHovered(null);
       options.onHover?.(null);
     }
   };
 
-  // Distinguish a click from the tail of an orbit drag.
-  let downAt: { x: number; y: number } | null = null;
-  const onPointerDown = (ev: PointerEvent) => {
-    downAt = { x: ev.clientX, y: ev.clientY };
-  };
-
   const onPointerUp = (ev: PointerEvent) => {
     const start = downAt;
+    const wasDragging = isDragging;
     downAt = null;
-    if (!start || !layerVisible) return;
-    if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > CLICK_SLOP_PX) return;
-    if (lastAltitude >= BORDER_VISIBLE_ALTITUDE) return;
+    isDragging = false;
+    container.style.cursor = 'grab';
 
+    if (!start || !layerVisible) return;
+    if (wasDragging || Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > CLICK_SLOP_PX) return;
+
+    // It was an intentional click
     const hit = districtAtPointer(ev);
-    // A click on empty ocean or outside India clears the selection, which is
-    // the only way back out of a district without using the panel.
-    setSelected(hit?.id ?? null);
-    options.onSelect?.(hit ?? null);
+    if (hit) {
+      setSelected(hit.id);
+      options.onSelect?.(hit);
+    } else {
+      setSelected(null);
+      options.onSelect?.(null);
+    }
   };
 
   container.addEventListener('pointermove', onPointerMove);
@@ -652,15 +686,12 @@ export async function attachDistrictLayer(
 
     get: (id) => byId.get(id),
 
-    flyTo(id, ms = 1100) {
+    flyTo(id, ms = 900) {
       const d = byId.get(id);
       if (!d) return;
       const [minLon, minLat, maxLon, maxLat] = d.bbox;
-      // Frame the district: altitude scaled off its larger extent so a small
-      // urban district and a large desert one both fill a similar share of the
-      // viewport.
       const extent = Math.max(maxLon - minLon, maxLat - minLat);
-      const altitude = Math.min(0.45, Math.max(0.06, extent * 0.3));
+      const altitude = Math.min(0.38, Math.max(0.08, extent * 0.28));
       globe.pointOfView({ lat: d.centroid[1], lng: d.centroid[0], altitude }, ms);
     },
 

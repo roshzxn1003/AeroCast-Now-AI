@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import {
   Activity,
   CheckCircle2,
-  ChevronDown,
   Clock,
   Info,
   MapPin,
   ShieldAlert,
-  Zap,
+  Radio,
 } from 'lucide-react';
 import { LightningGlobe } from '../components/LightningGlobe';
+import { TamilNaduReportModal } from '../components/TamilNaduReportModal';
 import { ModelReportPanel } from '../components/ModelReportPanel';
 import { LightningJumpBanner } from '../components/LightningJumpBanner';
 import {
@@ -19,8 +19,7 @@ import {
 } from '../components/LiveDomainPanel';
 import { useLiveStore } from '../store/liveStore';
 import { useNowcastStore } from '../store/nowcastStore';
-import { FLASH, SEVERITY_COLOR, SEVERITY_LEVELS } from '../design/tokens';
-import { ProvenanceBadge } from '../components/ui';
+import { SEVERITY_COLOR } from '../design/tokens';
 import {
   assessThunderstormThreat,
   MAJOR_INDIAN_CITIES,
@@ -55,6 +54,9 @@ export const CommandScreen: React.FC = () => {
     setActiveTab,
   } = useNowcastStore();
 
+  const [stateReportSlug, setStateReportSlug] = useState<string | null>(null);
+  const [targetFocus, setTargetFocus] = useState<{ lat: number; lng: number; altitude?: number } | null>(null);
+
   useEffect(() => startPolling(), [startPolling]);
 
   const maxDbz = nowcastData?.observation?.max_dbz || 0;
@@ -74,14 +76,39 @@ export const CommandScreen: React.FC = () => {
   return (
     <div className="flex flex-col xl:flex-row gap-3 p-3 xl:h-[calc(100dvh-3.5rem)] min-h-0">
       {/* ---------------------------------------------------------------- Stage */}
-      <section className="relative w-full shrink-0 xl:flex-1 min-w-0 h-[52vh] xl:h-auto rounded-[12px] border border-[var(--color-line)] overflow-hidden bg-[var(--color-surface-void)]">
-        <LightningGlobe className="absolute inset-0" />
-        {summary && <HeroCount count={summary.strike_count_30min} status={lightning?.status} />}
-        <GlobeLegend />
+      <section className="relative w-full shrink-0 xl:flex-1 min-w-0 h-[62vh] sm:h-[68vh] xl:h-auto rounded-[14px] border border-[var(--color-line)] overflow-hidden bg-[var(--color-surface-void)] shadow-2xl">
+        <LightningGlobe
+          className="absolute inset-0"
+          onOpenStateReport={(slug) => setStateReportSlug(slug)}
+          targetFocus={targetFocus}
+        />
       </section>
 
       {/* ----------------------------------------------------------------- Rail */}
       <aside className="w-full xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col gap-3 min-h-0 pb-20 xl:pb-0 xl:overflow-y-auto [&>*]:shrink-0">
+        {/* Tamil Nadu State Intelligence Banner */}
+        <div className="panel p-3 bg-gradient-to-r from-slate-900 via-cyan-950/40 to-slate-900 border border-cyan-500/30 rounded-xl shadow-lg flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+              <Radio className="w-4 h-4 animate-pulse" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-1.5 font-mono">
+                <span>TAMIL NADU 38-DISTRICT HUB</span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Live Convective & Hazard Reports
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setStateReportSlug('tamil-nadu')}
+            className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs font-bold transition-all shadow-md flex items-center gap-1"
+          >
+            <span>Open Hub</span>
+          </button>
+        </div>
+
         {uiMode === 'citizen' ? (
           <>
             <ThreatHero threat={threat} />
@@ -113,94 +140,17 @@ export const CommandScreen: React.FC = () => {
           </>
         )}
       </aside>
+
+      {/* Tamil Nadu Convective Report Modal */}
+      <TamilNaduReportModal
+        isOpen={!!stateReportSlug}
+        onClose={() => setStateReportSlug(null)}
+        stateSlug={stateReportSlug || 'tamil-nadu'}
+        onFlyToDistrict={(d) => setTargetFocus({ lat: d.lat, lng: d.lon, altitude: 0.16 })}
+      />
     </div>
   );
 };
-
-// -----------------------------------------------------------------------------
-// Stage furniture
-// -----------------------------------------------------------------------------
-
-/**
- * The one figure that should be readable across a room. Deliberately carries no
- * secondary readings: rate and CAPE live in the rail, and repeating them here is
- * what made the old header, HUD and rail disagree at a glance.
- */
-const HeroCount: React.FC<{ count: number; status?: string }> = ({ count, status }) => (
-  <div className="absolute top-4 left-4 z-20 pointer-events-none">
-    <div className="flex items-center gap-2">
-      <Zap className="w-3.5 h-3.5 text-[var(--color-ink-faint)]" />
-      <span className="eyebrow">Flashes · last 30 min</span>
-    </div>
-    <div className="flex items-baseline gap-2 mt-1">
-      <span
-        className="font-mono tabular font-medium leading-none"
-        style={{ fontSize: 'var(--text-display)', color: FLASH.cg }}
-      >
-        {count.toLocaleString()}
-      </span>
-      {status && <ProvenanceBadge provenance={status} />}
-    </div>
-  </div>
-);
-
-/** Collapsed by default: a legend is reference material, not a permanent panel. */
-const GlobeLegend: React.FC = () => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="absolute bottom-3 left-3 z-20 hidden sm:block">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] border border-[var(--color-line)] bg-[rgba(11,15,20,0.92)] text-[11px] font-mono text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
-      >
-        Legend
-        <ChevronDown
-          className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && (
-        <div
-          className="mt-1.5 panel px-3 py-2.5 space-y-2 enter"
-          style={{ background: 'rgba(11,15,20,0.94)' }}
-        >
-          <LegendRow label="Storm energy">
-            <span className="flex rounded-full overflow-hidden h-2 w-16">
-              {SEVERITY_LEVELS.map((level) => (
-                <span key={level} className="flex-1" style={{ background: SEVERITY_COLOR[level] }} />
-              ))}
-            </span>
-          </LegendRow>
-          <LegendRow label="Ground strike">
-            <span className="w-2 h-2 rounded-full" style={{ background: FLASH.cg }} />
-          </LegendRow>
-          <LegendRow label="In-cloud">
-            <span className="w-2 h-2 rounded-full" style={{ background: FLASH.ic }} />
-          </LegendRow>
-          <LegendRow label="City">
-            <span className="w-2 h-2 rounded-full bg-cyan-400" />
-          </LegendRow>
-          <p className="text-[10px] text-[var(--color-ink-faint)] pt-1 max-w-[15rem] leading-snug border-t border-[var(--color-line-faint)]">
-            Column height encodes convective vigour. Drag to rotate, scroll to
-            zoom, click a marker to inspect.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const LegendRow: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
-  <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-muted)]">
-    <span className="w-16 shrink-0 flex items-center">{children}</span>
-    <span>{label}</span>
-  </div>
-);
 
 // -----------------------------------------------------------------------------
 // Rail furniture

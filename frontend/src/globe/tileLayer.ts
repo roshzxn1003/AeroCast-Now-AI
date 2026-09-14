@@ -92,7 +92,7 @@ const STYLES: Record<TileStyle, StyleSpec> = {
  * or more is in frame and tiles would cost hundreds of requests to show detail
  * nobody can resolve.
  */
-export const TILE_VISIBLE_ALTITUDE = 1.2;
+export const TILE_VISIBLE_ALTITUDE = 0.38;
 
 const MIN_ZOOM = 3;
 /**
@@ -129,33 +129,80 @@ const FADE_MS = 260;
 /**
  * Basemap colour grading.
  *
- * The imagery is rendered as a single blue layer rather than in true colour.
- * Vegetation greens and desert sands are high-chroma and cover most of the
- * land, so in natural colour they compete directly with the severity ramp and
- * the lightning — the eye lands on a bright green field instead of on the
- * storm sitting over it.
- *
- * Saturation is taken to zero, so no trace of the original hue survives: the
- * tile is reduced to pure luminance and re-tinted blue. Every bit of real
- * detail is kept — coastlines, terrain relief, rivers, cities, water — but all
- * of it in one colour, which hands the entire colour budget to the data.
- *
- * Done in the shader, not by tinting the material: a plain multiply darkens
- * without desaturating, and the greens survive it.
+ * Dark mode: natural deep nocturnal palette matching earth-night.jpg.
+ * Day mode: true-colour natural satellite photography.
  */
-const GRADE = {
-  /** 0 = pure luminance, no original hue at all. 1 = untouched imagery. */
-  saturation: 0.0,
-  contrast: 1.22,
-  brightness: -0.10,
-  /**
-   * The blue layer. The red channel is held far down deliberately: lift it and
-   * bright terrain climbs toward equal RGB, which is exactly what reads as
-   * grey. Keeping red low forces every luminance level to stay unambiguously
-   * blue, from deep ocean shadow to lit relief.
-   */
-  tint: [0.14, 0.38, 0.98] as const,
+const THEME_TARGETS = {
+  day: {
+    saturation: 1.0,
+    contrast: 1.05,
+    brightness: 0.0,
+    tint: [1.0, 1.0, 1.0] as const,
+  },
+  night: {
+    saturation: 0.35,
+    contrast: 1.18,
+    brightness: -0.15,
+    tint: [0.75, 0.88, 1.05] as const,
+  },
 };
+
+const tileUniforms = {
+  uSaturation: { value: THEME_TARGETS.night.saturation },
+  uContrast: { value: THEME_TARGETS.night.contrast },
+  uBrightness: { value: THEME_TARGETS.night.brightness },
+  uTint: { value: new THREE.Vector3(...THEME_TARGETS.night.tint) },
+};
+
+let themeAnimFrame: number | null = null;
+
+export function setTileGrade(theme: 'day' | 'night', immediate = false): void {
+  const target = THEME_TARGETS[theme];
+  if (themeAnimFrame != null) {
+    cancelAnimationFrame(themeAnimFrame);
+    themeAnimFrame = null;
+  }
+
+  if (immediate) {
+    tileUniforms.uSaturation.value = target.saturation;
+    tileUniforms.uContrast.value = target.contrast;
+    tileUniforms.uBrightness.value = target.brightness;
+    tileUniforms.uTint.value.set(target.tint[0], target.tint[1], target.tint[2]);
+    return;
+  }
+
+  const startSat = tileUniforms.uSaturation.value;
+  const startCont = tileUniforms.uContrast.value;
+  const startBright = tileUniforms.uBrightness.value;
+  const startR = tileUniforms.uTint.value.x;
+  const startG = tileUniforms.uTint.value.y;
+  const startB = tileUniforms.uTint.value.z;
+
+  const startTime = performance.now();
+  const DURATION_MS = 450;
+
+  function step() {
+    const elapsed = performance.now() - startTime;
+    const progress = Math.min(1, elapsed / DURATION_MS);
+    const ease = 0.5 - 0.5 * Math.cos(progress * Math.PI);
+
+    tileUniforms.uSaturation.value = startSat + (target.saturation - startSat) * ease;
+    tileUniforms.uContrast.value = startCont + (target.contrast - startCont) * ease;
+    tileUniforms.uBrightness.value = startBright + (target.brightness - startBright) * ease;
+    tileUniforms.uTint.value.set(
+      startR + (target.tint[0] - startR) * ease,
+      startG + (target.tint[1] - startG) * ease,
+      startB + (target.tint[2] - startB) * ease,
+    );
+
+    if (progress < 1) {
+      themeAnimFrame = requestAnimationFrame(step);
+    } else {
+      themeAnimFrame = null;
+    }
+  }
+  themeAnimFrame = requestAnimationFrame(step);
+}
 
 /**
  * Inject the grade into a MeshBasicMaterial.
@@ -165,12 +212,10 @@ const GRADE = {
  */
 function applyGrade(material: THREE.MeshBasicMaterial): void {
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uSaturation = { value: GRADE.saturation };
-    shader.uniforms.uContrast = { value: GRADE.contrast };
-    shader.uniforms.uBrightness = { value: GRADE.brightness };
-    shader.uniforms.uTint = {
-      value: new THREE.Vector3(...GRADE.tint),
-    };
+    shader.uniforms.uSaturation = tileUniforms.uSaturation;
+    shader.uniforms.uContrast = tileUniforms.uContrast;
+    shader.uniforms.uBrightness = tileUniforms.uBrightness;
+    shader.uniforms.uTint = tileUniforms.uTint;
 
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -246,6 +291,7 @@ interface Tile {
 export interface TileLayerHandle {
   setStyle(style: TileStyle): void;
   setVisible(visible: boolean): void;
+  setTheme?(theme: 'night' | 'day'): void;
   /** Provider attribution for the current style. */
   attribution(): string;
   /** Current tile zoom level, or null when the layer is dormant. */
@@ -708,6 +754,10 @@ export function attachTileLayer(
     setVisible(next) {
       visible = next;
       sync();
+    },
+
+    setTheme(theme) {
+      setTileGrade(theme);
     },
 
     attribution: () => STYLES[style].attribution,
