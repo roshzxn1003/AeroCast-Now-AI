@@ -15,6 +15,7 @@ import {
   MapPin,
   Radar,
   Radio,
+  RefreshCw,
 } from 'lucide-react';
 import {
   LineChart,
@@ -49,7 +50,14 @@ export const AlertsScreen: React.FC = () => {
     });
   }, []);
 
-  if (!nowcastData) return null;
+  if (!nowcastData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 text-slate-400 font-mono text-xs">
+        <RefreshCw className="w-7 h-7 text-cyan-400 animate-spin" />
+        <span>Loading Lightning Jump & Warning Telemetry…</span>
+      </div>
+    );
+  }
 
   const jump = nowcastData.lightning_jump;
   const cap = nowcastData.cap_bulletin;

@@ -686,7 +686,7 @@ export async function attachDistrictLayer(
 
     get: (id) => byId.get(id),
 
-    flyTo(id, ms = 900) {
+    flyTo(id, ms = 1200) {
       const d = byId.get(id);
       if (!d) return;
       const [minLon, minLat, maxLon, maxLat] = d.bbox;

@@ -1,9 +1,16 @@
 import os
+import sys
 import json
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
+
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
 from observation_service import generate_convective_storm_field, GRID_SIZE
 from nowcasting_engine import build_convlstm_model, weighted_convective_loss
 
@@ -74,10 +81,18 @@ def calculate_meteorological_scores(y_true_dbz: np.ndarray, y_pred_dbz: np.ndarr
     return csi, pod, far, hss
 
 def main():
-    os.makedirs("models", exist_ok=True)
+    parser = argparse.ArgumentParser(description="Train Spatio-Temporal ResAtt-ConvLSTM2D Model for AeroCast-Now")
+    parser.add_argument("--epochs", type=int, default=18, help="Number of training epochs (default: 18)")
+    parser.add_argument("--samples", type=int, default=160, help="Number of multi-modal sequences (default: 160)")
+    parser.add_argument("--batch-size", type=int, default=8, help="Batch size (default: 8)")
+    parser.add_argument("--output-dir", type=str, default=None, help="Output models directory (default: backend/models)")
+    args = parser.parse_args()
+
+    models_dir = args.output_dir or os.path.join(backend_dir, "models")
+    os.makedirs(models_dir, exist_ok=True)
     
     # 1. Generate convective training dataset
-    X, Y = generate_multimodal_training_dataset(n_sequences=160, grid_size=GRID_SIZE)
+    X, Y = generate_multimodal_training_dataset(n_sequences=args.samples, grid_size=GRID_SIZE)
     print(f"Dataset generated: X shape = {X.shape}, Y shape = {Y.shape}")
     
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
@@ -89,8 +104,8 @@ def main():
     model.summary()
     
     # 3. Train Model with learning rate schedule
-    epochs = 18
-    batch_size = 8
+    epochs = args.epochs
+    batch_size = args.batch_size
     print(f"🚀 Training ResAtt-ConvLSTM2D for {epochs} epochs with Weighted Balanced Convective Loss...")
     
     lr_callback = tf.keras.callbacks.ReduceLROnPlateau(
@@ -111,7 +126,7 @@ def main():
     )
     
     # 4. Save Upgraded Model Checkpoint
-    model_save_path = "models/convlstm_nowcaster.keras"
+    model_save_path = os.path.join(models_dir, "convlstm_nowcaster.keras")
     model.save(model_save_path)
     print(f"✅ Saved trained ResAtt-ConvLSTM model to {model_save_path}")
     
@@ -166,7 +181,8 @@ def main():
         "validation_samples": int(X_test.shape[0])
     }
     
-    with open("models/model_metadata.json", "w") as f:
+    meta_path = os.path.join(models_dir, "model_metadata.json")
+    with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=4)
         
     print("📊 Evaluation Metrics (Threshold = 35 dBZ):")
@@ -208,7 +224,7 @@ def main():
         plt.text(bar.get_x() + bar.get_width()/2.0, yval + 0.02, f"{yval:.2f}", ha='center', va='bottom', fontsize=9, fontweight='bold')
         
     plt.tight_layout()
-    plot_path = "models/training_performance.png"
+    plot_path = os.path.join(models_dir, "training_performance.png")
     plt.savefig(plot_path, dpi=200)
     plt.close()
     print(f"📈 Saved diagnostic training plot to {plot_path}")

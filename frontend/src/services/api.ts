@@ -15,6 +15,8 @@ import {
   DistrictNowcastResponse,
   DistrictSummaryResponse,
   StateConvectiveReport,
+  DataPipelineStatus,
+  NormalizedObservationFrontend,
 } from '../types/nowcast';
 
 const API_BASE = '/api';
@@ -410,3 +412,8 @@ export const fetchLightningField = (windowMinutes = 30, limit = 2500) =>
   getJSON<LightningField>(`/live/strikes?window_minutes=${windowMinutes}&limit=${limit}`);
 
 export const fetchNetworkStatus = () => getJSON<NetworkStatus>('/live/network-status');
+
+export const fetchDataPipelineStatus = () => getJSON<DataPipelineStatus>('/data/status');
+
+export const fetchCurrentObservation = (stationName: string) =>
+  getJSON<NormalizedObservationFrontend>(`/data/current?station=${encodeURIComponent(stationName)}`);

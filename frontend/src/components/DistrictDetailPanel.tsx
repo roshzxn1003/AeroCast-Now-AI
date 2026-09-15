@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Crosshair, Radar, Zap, RefreshCw } from 'lucide-react';
+import { X, Crosshair, Radar, Zap, RefreshCw, Radio, Brain, Layers } from 'lucide-react';
 import { District, haversineKm } from '../services/districts';
 import {
   DistrictOutlook,
@@ -23,9 +23,11 @@ import {
 } from '../services/districtWeather';
 import { DEFAULT_STATIONS, fetchDistrictNowcast } from '../services/api';
 import { useLiveStore } from '../store/liveStore';
-import { ConvectiveNode, RadarStation, Strike, DistrictNowcastResponse } from '../types/nowcast';
+import { useNowcastStore } from '../store/nowcastStore';
+import { ConvectiveNode, RadarStation, Strike, DistrictNowcastResponse, OutputDataSource } from '../types/nowcast';
 import { Badge, Loading, SeverityTag, Stat } from './ui';
 import { severityColor } from '../design/tokens';
+import { OutputDataSourceSwitcher } from './OutputDataSourceSwitcher';
 
 interface DistrictDetailPanelProps {
   district: District;
@@ -61,6 +63,14 @@ export const DistrictDetailPanel: React.FC<DistrictDetailPanelProps> = ({
 
   const lightning = useLiveStore((s) => s.lightning);
   const convective = useLiveStore((s) => s.convective);
+
+  const globalSource = useNowcastStore((s) => s.outputDataSource);
+  const setGlobalSource = useNowcastStore((s) => s.setOutputDataSource);
+  const [panelSource, setPanelSource] = useState<OutputDataSource>(globalSource);
+
+  useEffect(() => {
+    setPanelSource(globalSource);
+  }, [globalSource]);
 
   // The 120-hour outlook is fetched separately from the live reading: it is a
   // different horizon on a much slower cache, and a failure in one must not
@@ -215,72 +225,116 @@ export const DistrictDetailPanel: React.FC<DistrictDetailPanelProps> = ({
 
           <p className="district-panel__conditions">{weather.conditions}</p>
 
-          {/* -- Surface --------------------------------------------------- */}
-          <Section title="Surface" provenance="LIVE">
-            <div className="district-grid">
-              <Stat label="Temp" value={fmt(weather.temperatureC, 1)} unit="°C" size="sm" />
-              <Stat label="Feels like" value={fmt(weather.apparentC, 1)} unit="°C" size="sm" />
-              <Stat label="Humidity" value={fmt(weather.humidityPct)} unit="%" size="sm" />
-              <Stat label="Cloud" value={fmt(weather.cloudCoverPct)} unit="%" size="sm" />
-              <Stat
-                label="Wind"
-                value={fmt(weather.windKph)}
-                unit="km/h"
-                note={compass(weather.windDirDeg)}
-                size="sm"
-              />
-              <Stat label="Gusts" value={fmt(weather.gustKph)} unit="km/h" size="sm" />
-              <Stat label="Pressure" value={fmt(weather.pressureHpa)} unit="hPa" size="sm" />
-              <Stat label="Precip" value={fmt(weather.precipitationMm, 1)} unit="mm" size="sm" />
+          {/* -- Output Data Source Switcher (Live vs Model vs All) -- */}
+          <div className="mx-3 my-2.5 p-2 rounded-xl bg-slate-950/70 border border-white/10 flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                Detail Output Feed:
+              </span>
+              <span className="text-[10px] font-mono font-semibold text-cyan-400">
+                {panelSource === 'all'
+                  ? 'Hybrid (All Details)'
+                  : panelSource === 'live'
+                  ? 'Live Measured Sensors'
+                  : 'AI ConvLSTM2D Model'}
+              </span>
             </div>
-          </Section>
+            <OutputDataSourceSwitcher
+              value={panelSource}
+              onChange={(val) => {
+                setPanelSource(val);
+                setGlobalSource(val);
+              }}
+              size="xs"
+              compact={true}
+              className="w-full justify-between [&>*]:flex-1 [&>*]:justify-center"
+            />
+          </div>
 
-          {/* -- Sounding -------------------------------------------------- */}
-          <Section title="Instability" provenance="LIVE-DERIVED">
-            <div className="district-grid">
-              <Stat
-                label="CAPE"
-                value={fmt(weather.capeJkg)}
-                unit="J/kg"
-                note={capeNote(weather.capeJkg)}
-                size="sm"
-              />
-              <Stat
-                label="CIN"
-                value={fmt(weather.cinJkg)}
-                unit="J/kg"
-                note={cinNote(weather.cinJkg)}
-                size="sm"
-              />
-              <Stat
-                label="Lifted index"
-                value={fmt(weather.liftedIndex, 1)}
-                unit="°C"
-                note={liNote(weather.liftedIndex)}
-                size="sm"
-              />
-              <Stat
-                label="Bulk shear"
-                value={fmt(weather.shearKt)}
-                unit="kt"
-                note={shearNote(weather.shearKt)}
-                size="sm"
-              />
-              <Stat
-                label="Precip prob"
-                value={fmt(weather.precipProbPct)}
-                unit="%"
-                size="sm"
-              />
+          {panelSource === 'live' && (
+            <div className="mx-3 mb-2 px-2.5 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-2 animate-in fade-in">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span>Filtering to <strong>Live Ground Truth</strong> (AWS sensors & radar scans)</span>
             </div>
-            <p className="district-panel__note">
-              Shear is a 10 m to 500 hPa proxy for 0–6 km bulk shear, not a
-              measured sounding.
-            </p>
-          </Section>
+          )}
 
-          {/* -- AI Nowcast Timeline (+15m to +120m) ------------------ */}
-          {nowcast && (
+          {panelSource === 'model' && (
+            <div className="mx-3 mb-2 px-2.5 py-1.5 rounded-lg bg-purple-950/40 border border-purple-500/30 text-[11px] text-purple-300 flex items-center gap-2 animate-in fade-in">
+              <Brain className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <span>Filtering to <strong>AI Model Predictions</strong> (ConvLSTM2D & 120h outlook)</span>
+            </div>
+          )}
+
+          {/* -- Surface (LIVE) -------------------------------------------- */}
+          {(panelSource === 'all' || panelSource === 'live') && (
+            <Section title="Surface" provenance="LIVE">
+              <div className="district-grid">
+                <Stat label="Temp" value={fmt(weather.temperatureC, 1)} unit="°C" size="sm" />
+                <Stat label="Feels like" value={fmt(weather.apparentC, 1)} unit="°C" size="sm" />
+                <Stat label="Humidity" value={fmt(weather.humidityPct)} unit="%" size="sm" />
+                <Stat label="Cloud" value={fmt(weather.cloudCoverPct)} unit="%" size="sm" />
+                <Stat
+                  label="Wind"
+                  value={fmt(weather.windKph)}
+                  unit="km/h"
+                  note={compass(weather.windDirDeg)}
+                  size="sm"
+                />
+                <Stat label="Gusts" value={fmt(weather.gustKph)} unit="km/h" size="sm" />
+                <Stat label="Pressure" value={fmt(weather.pressureHpa)} unit="hPa" size="sm" />
+                <Stat label="Precip" value={fmt(weather.precipitationMm, 1)} unit="mm" size="sm" />
+              </div>
+            </Section>
+          )}
+
+          {/* -- Sounding (LIVE-DERIVED) ----------------------------------- */}
+          {(panelSource === 'all' || panelSource === 'live') && (
+            <Section title="Instability" provenance="LIVE-DERIVED">
+              <div className="district-grid">
+                <Stat
+                  label="CAPE"
+                  value={fmt(weather.capeJkg)}
+                  unit="J/kg"
+                  note={capeNote(weather.capeJkg)}
+                  size="sm"
+                />
+                <Stat
+                  label="CIN"
+                  value={fmt(weather.cinJkg)}
+                  unit="J/kg"
+                  note={cinNote(weather.cinJkg)}
+                  size="sm"
+                />
+                <Stat
+                  label="Lifted index"
+                  value={fmt(weather.liftedIndex, 1)}
+                  unit="°C"
+                  note={liNote(weather.liftedIndex)}
+                  size="sm"
+                />
+                <Stat
+                  label="Bulk shear"
+                  value={fmt(weather.shearKt)}
+                  unit="kt"
+                  note={shearNote(weather.shearKt)}
+                  size="sm"
+                />
+                <Stat
+                  label="Precip prob"
+                  value={fmt(weather.precipProbPct)}
+                  unit="%"
+                  size="sm"
+                />
+              </div>
+              <p className="district-panel__note">
+                Shear is a 10 m to 500 hPa proxy for 0–6 km bulk shear, not a
+                measured sounding.
+              </p>
+            </Section>
+          )}
+
+          {/* -- AI Nowcast Timeline (MODEL) (+15m to +120m) ------------------ */}
+          {(panelSource === 'all' || panelSource === 'model') && nowcast && (
             <>
               {nowcast.lightning_jump_alert?.jump_detected && (
                 <div className="mx-4 my-2 p-2.5 rounded-lg border border-purple-500/40 bg-purple-950/40 text-purple-200 text-xs flex items-start gap-2">
@@ -339,52 +393,57 @@ export const DistrictDetailPanel: React.FC<DistrictDetailPanelProps> = ({
         </>
       )}
 
-      {outlook && outlook.days.length > 0 && <OutlookSection outlook={outlook} />}
+      {/* -- Outlook · 120 h (MODEL) --------------------------------------- */}
+      {(panelSource === 'all' || panelSource === 'model') && outlook && outlook.days.length > 0 && (
+        <OutlookSection outlook={outlook} />
+      )}
 
-      {/* -- Observing network -------------------------------------------- */}
-      <Section title="Observing network">
-        {nearestStation && (
+      {/* -- Observing network (LIVE) -------------------------------------- */}
+      {(panelSource === 'all' || panelSource === 'live') && (
+        <Section title="Observing network" provenance="LIVE">
+          {nearestStation && (
+            <Row
+              icon={Radar}
+              label={nearestStation.station.name}
+              value={`${nearestStation.km.toFixed(0)} km`}
+              note={
+                nearestStation.km <= nearestStation.station.range_km
+                  ? `Inside ${nearestStation.station.range_km} km scan radius`
+                  : `Outside ${nearestStation.station.range_km} km scan radius — radar gap`
+              }
+              tone={
+                nearestStation.km <= nearestStation.station.range_km
+                  ? 'var(--color-prov-live)'
+                  : 'var(--color-sev-severe)'
+              }
+            />
+          )}
+
+          {nearestNode && (
+            <Row
+              icon={Crosshair}
+              label={`Nearest cell · ${nearestNode.node.name}`}
+              value={`${nearestNode.km.toFixed(0)} km`}
+              note={`${nearestNode.node.instability} · CAPE ${nearestNode.node.cape_j_kg.toFixed(0)} J/kg`}
+              tone={severityColor(nearestNode.node.instability)}
+            />
+          )}
+
           <Row
-            icon={Radar}
-            label={nearestStation.station.name}
-            value={`${nearestStation.km.toFixed(0)} km`}
+            icon={Zap}
+            label={`Strikes within ${STRIKE_RADIUS_KM} km`}
+            value={String(nearbyStrikes.total)}
             note={
-              nearestStation.km <= nearestStation.station.range_km
-                ? `Inside ${nearestStation.station.range_km} km scan radius`
-                : `Outside ${nearestStation.station.range_km} km scan radius — radar gap`
+              nearbyStrikes.total === 0
+                ? 'No flashes in the detection window'
+                : `${nearbyStrikes.cg} cloud-to-ground · newest ${
+                    nearbyStrikes.newest ? `${Math.round(nearbyStrikes.newest.age_s)}s ago` : '--'
+                  }`
             }
-            tone={
-              nearestStation.km <= nearestStation.station.range_km
-                ? 'var(--color-prov-live)'
-                : 'var(--color-sev-severe)'
-            }
+            tone={nearbyStrikes.total > 0 ? 'var(--color-flash-cg)' : undefined}
           />
-        )}
-
-        {nearestNode && (
-          <Row
-            icon={Crosshair}
-            label={`Nearest cell · ${nearestNode.node.name}`}
-            value={`${nearestNode.km.toFixed(0)} km`}
-            note={`${nearestNode.node.instability} · CAPE ${nearestNode.node.cape_j_kg.toFixed(0)} J/kg`}
-            tone={severityColor(nearestNode.node.instability)}
-          />
-        )}
-
-        <Row
-          icon={Zap}
-          label={`Strikes within ${STRIKE_RADIUS_KM} km`}
-          value={String(nearbyStrikes.total)}
-          note={
-            nearbyStrikes.total === 0
-              ? 'No flashes in the detection window'
-              : `${nearbyStrikes.cg} cloud-to-ground · newest ${
-                  nearbyStrikes.newest ? `${Math.round(nearbyStrikes.newest.age_s)}s ago` : '--'
-                }`
-          }
-          tone={nearbyStrikes.total > 0 ? 'var(--color-flash-cg)' : undefined}
-        />
-      </Section>
+        </Section>
+      )}
 
       <footer className="district-panel__foot">
         <span>

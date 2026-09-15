@@ -8,12 +8,15 @@ import {
   MoreSubScreen,
   ModelMetadata,
   SystemHealth,
+  OutputDataSource,
+  DataPipelineStatus,
 } from '../types/nowcast';
 import {
   fetchStations,
   fetchNowcast,
   fetchModelInfo,
   fetchHealth,
+  fetchDataPipelineStatus,
   DEFAULT_STATIONS,
 } from '../services/api';
 
@@ -48,6 +51,7 @@ interface NowcastState {
 
   // UI Mode (Citizen for plain English vs Pro for scientific telemetry)
   uiMode: 'citizen' | 'pro';
+  outputDataSource: OutputDataSource;
   soundEnabled: boolean;
   earthTheme: 'night' | 'day';
   selectedCity: string;
@@ -62,6 +66,7 @@ interface NowcastState {
   nowcastData: NowcastResponse | null;
   modelInfo: ModelMetadata | null;
   systemHealth: SystemHealth | null;
+  dataPipelineStatus: DataPipelineStatus | null;
 
   // Status
   isLoading: boolean;
@@ -74,6 +79,7 @@ interface NowcastState {
   setTimeIndex: (idx: number) => void;
   togglePlayback: () => void;
   setUiMode: (mode: 'citizen' | 'pro') => void;
+  setOutputDataSource: (source: OutputDataSource) => void;
   setSoundEnabled: (enabled: boolean) => void;
   setEarthTheme: (theme: 'night' | 'day') => void;
   setSelectedCity: (cityId: string) => void;
@@ -84,6 +90,7 @@ interface NowcastState {
   loadNowcast: () => Promise<void>;
   loadModelInfo: () => Promise<void>;
   loadHealth: () => Promise<void>;
+  loadDataPipelineStatus: () => Promise<void>;
 }
 
 export const useNowcastStore = create<NowcastState>((set, get) => ({
@@ -94,18 +101,20 @@ export const useNowcastStore = create<NowcastState>((set, get) => ({
   isPlaying: false,
 
   uiMode: 'citizen', // Default to citizen friendly mode
+  outputDataSource: 'all', // Default: Combined Live Observations & AI Model
   soundEnabled: false, // Default muted until user toggles on
   earthTheme: 'night',
   selectedCity: 'chennai',
 
   selectedStation: 'Chennai DWR (Sriharikota/Port)',
-  stormScenario: 'Severe Squall Line',
-  hasJump: true,
+  stormScenario: 'Live Observation',
+  hasJump: false,
 
   stations: DEFAULT_STATIONS,
   nowcastData: null,
   modelInfo: null,
   systemHealth: null,
+  dataPipelineStatus: null,
 
   isLoading: false,
   error: null,
@@ -115,6 +124,7 @@ export const useNowcastStore = create<NowcastState>((set, get) => ({
   setChannelMode: (mode) => set({ channelMode: mode }),
   setTimeIndex: (idx) => set({ timeIndex: Math.max(0, Math.min(9, idx)) }),
   setUiMode: (mode) => set({ uiMode: mode }),
+  setOutputDataSource: (source) => set({ outputDataSource: source }),
   setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
   setEarthTheme: (theme) => set({ earthTheme: theme }),
   setSelectedCity: (cityId) => set({ selectedCity: cityId }),
@@ -174,6 +184,15 @@ export const useNowcastStore = create<NowcastState>((set, get) => ({
       set({ systemHealth });
     } catch (err: any) {
       console.warn('Health check error:', err.message);
+    }
+  },
+
+  loadDataPipelineStatus: async () => {
+    try {
+      const dataPipelineStatus = await fetchDataPipelineStatus();
+      set({ dataPipelineStatus });
+    } catch (err: any) {
+      console.warn('Data pipeline status check error:', err.message);
     }
   },
 }));

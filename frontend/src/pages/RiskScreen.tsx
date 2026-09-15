@@ -12,6 +12,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from 'lucide-react';
 
 export const RiskScreen: React.FC = () => {
@@ -19,7 +20,14 @@ export const RiskScreen: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [expandedSector, setExpandedSector] = useState<string | null>('aviation');
 
-  if (!nowcastData) return null;
+  if (!nowcastData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 text-slate-400 font-mono text-xs">
+        <RefreshCw className="w-7 h-7 text-cyan-400 animate-spin" />
+        <span>Loading Sector Vulnerability & Risk Matrix…</span>
+      </div>
+    );
+  }
 
   const maxDbz = nowcastData.observation.max_dbz;
   const maxVil = nowcastData.observation.max_vil;

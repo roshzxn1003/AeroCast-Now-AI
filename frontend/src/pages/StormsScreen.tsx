@@ -2,7 +2,7 @@ import React from 'react';
 import { useNowcastStore } from '../store/nowcastStore';
 import { RadarViewport } from '../components/RadarViewport';
 import { TimeScrubber } from '../components/TimeScrubber';
-import { Activity, Navigation, Wind, ShieldAlert, BarChart3, TrendingUp, Compass } from 'lucide-react';
+import { Activity, Navigation, Wind, ShieldAlert, BarChart3, TrendingUp, Compass, RefreshCw } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -17,7 +17,14 @@ import {
 export const StormsScreen: React.FC = () => {
   const { nowcastData } = useNowcastStore();
 
-  if (!nowcastData) return null;
+  if (!nowcastData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 text-slate-400 font-mono text-xs">
+        <RefreshCw className="w-7 h-7 text-cyan-400 animate-spin" />
+        <span>Loading Storm Cells & Radar Kinematics…</span>
+      </div>
+    );
+  }
 
   const cells = nowcastData.observation.storm_cells || [];
 

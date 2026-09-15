@@ -33,6 +33,8 @@ interface DistrictOverlayProps {
   globe: GlobeInstance | null;
   /** The element the globe canvas renders into — labels and picking attach here. */
   container: HTMLElement | null;
+  /** Optional top dock slot to render search inside flex layout alongside header controls */
+  renderTopDock?: (searchElement: React.ReactNode) => React.ReactNode;
 }
 
 /**
@@ -61,6 +63,7 @@ const SETTLE_MS = 700;
 export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
   globe,
   container,
+  renderTopDock,
 }) => {
   const layerRef = useRef<DistrictLayerHandle | null>(null);
   const tileRef = useRef<TileLayerHandle | null>(null);
@@ -217,7 +220,7 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
       onSelect: (d) => {
         setSelected(d);
         if (d) {
-          layerRef.current?.flyTo(d.id, 900);
+          layerRef.current?.flyTo(d.id, 1200);
           loadWeatherFor([d]);
         }
       },
@@ -299,9 +302,13 @@ export const DistrictOverlay: React.FC<DistrictOverlayProps> = ({
   const [legendOpen, setLegendOpen] = useState(false);
   const [legendTab, setLegendTab] = useState<'districts' | 'radar'>('districts');
 
+  const searchElement = (
+    <DistrictSearch onSelect={onSearchSelect} className="district-search-dock" />
+  );
+
   return (
     <>
-      <DistrictSearch onSelect={onSearchSelect} className="district-search-dock" />
+      {renderTopDock ? renderTopDock(searchElement) : searchElement}
 
       {hovered && !layerError && (
         <div className="district-hover" role="status">

@@ -62,64 +62,68 @@ export function assessThunderstormThreat(
   maxDbz: number,
   strikeCount30m: number,
 ): ThreatAssessment {
-  if (hasJump || maxDbz >= 52 || strikeCount30m > 1200) {
+  // Level 1: Extreme danger — verified lightning jump precursor OR intense radar core with active ground strikes
+  if ((hasJump && strikeCount30m > 30) || (maxDbz >= 54 && strikeCount30m > 100) || strikeCount30m > 1200) {
     return {
       level: 'DANGER',
-      badgeText: '🔴 EXTREME DANGER',
-      headline: 'Violent Thunderstorm & Lightning Surge Active',
-      subhead: 'Severe lightning, damaging winds, and possible hail arriving in 15–45 minutes.',
+      badgeText: '🔴 SEVERE WARNING',
+      headline: 'Severe Thunderstorm & Lightning Hazard Active',
+      subhead: 'Intense cloud-to-ground lightning and squally wind gusts occurring within the radar domain.',
       colorHex: '#ef4444',
-      bgRgba: 'rgba(239, 68, 68, 0.15)',
+      bgRgba: 'rgba(239, 68, 68, 0.12)',
       safetyActions: [
         'Seek immediate shelter inside a sturdy enclosed building or hardtop vehicle.',
-        'Unplug sensitive electronics and avoid contact with plumbing or wired phones.',
-        'Never take shelter under tall trees, metal poles, or open verandas.',
+        'Unplug sensitive electronics and avoid contact with plumbing or wired fixtures.',
+        'Never take shelter under tall trees, isolated metal poles, or open sheds.',
         'Stay indoors for at least 30 minutes after the last sound of thunder.',
       ],
     };
   }
 
-  if (activeCellsCount > 0 || maxDbz >= 40 || strikeCount30m > 400) {
+  // Level 2: Moderate to severe convective activity
+  if ((activeCellsCount > 0 && maxDbz >= 38) || (maxDbz >= 42 && strikeCount30m > 20) || strikeCount30m > 250) {
     return {
       level: 'WARNING',
-      badgeText: '🟠 SEVERE WARNING',
-      headline: 'Thunderstorms and Frequent Lightning Nearby',
-      subhead: 'Heavy rainfall and cloud-to-ground lightning occurring in the region.',
+      badgeText: '🟠 CONVECTIVE ALERT',
+      headline: 'Active Thunderstorm Cells in Domain',
+      subhead: 'Moderate to heavy rain bands and lightning activity detected by Doppler radar.',
       colorHex: '#f97316',
-      bgRgba: 'rgba(249, 115, 22, 0.15)',
+      bgRgba: 'rgba(249, 115, 22, 0.12)',
       safetyActions: [
-        'Avoid open sports grounds, lakes, and farming fields.',
-        'Drive with extreme caution and keep your vehicle headlights on.',
-        'Keep smartphones charged in case of local power grid tripping.',
+        'Avoid open sports grounds, elevated spots, lakes, and farmland.',
+        'Drive with caution; watch for waterlogged underpasses and reduced visibility.',
+        'Ensure communication devices remain charged in case of local power fluctuations.',
       ],
     };
   }
 
-  if (maxDbz >= 28 || strikeCount30m > 50) {
+  // Level 3: Convective Watch — developing clouds or isolated strikes
+  if (maxDbz >= 28 || strikeCount30m > 15 || activeCellsCount > 0) {
     return {
       level: 'WATCH',
-      badgeText: '🟡 THUNDERSTORM WATCH',
-      headline: 'Rain Clouds Developing — Watch the Skies',
-      subhead: 'Moderate rain showers with isolated thunder possible over the next hour.',
+      badgeText: '🟡 CONVECTIVE WATCH',
+      headline: 'Precipitation Clouds Developing Nearby',
+      subhead: 'Passing rain showers and isolated lightning possible over the next 1–2 hours.',
       colorHex: '#eab308',
-      bgRgba: 'rgba(234, 179, 8, 0.12)',
+      bgRgba: 'rgba(234, 179, 8, 0.10)',
       safetyActions: [
-        'Keep an umbrella or raincoat handy before heading outdoors.',
-        'Check back for updates if heading out for travel or outdoor events.',
+        'Keep rain gear accessible if planning outdoor commutes.',
+        'Monitor radar reflectivity updates as convective cells evolve.',
       ],
     };
   }
 
+  // Level 4: Clear Air / Stable
   return {
     level: 'SAFE',
-    badgeText: '🟢 CALM & SAFE',
-    headline: 'No Severe Thunderstorms Detected',
-    subhead: 'Atmospheric conditions are stable. Low likelihood of convective storms.',
+    badgeText: '🟢 CALM & STABLE',
+    headline: 'Stable Atmospheric Profile',
+    subhead: 'No significant thunderstorm cells or severe lightning detected across the local domain.',
     colorHex: '#10b981',
-    bgRgba: 'rgba(16, 185, 129, 0.12)',
+    bgRgba: 'rgba(16, 185, 129, 0.10)',
     safetyActions: [
       'Normal outdoor activities can proceed safely.',
-      'AeroCast AI continues monitoring real-time satellite and radar feeds.',
+      'AeroCast neural nowcaster continues active monitoring of radar and satellite feeds.',
     ],
   };
 }

@@ -162,7 +162,7 @@ def ingest_nowcast_multimodal_tensor(
     station_name: str = "Chennai DWR (Sriharikota/Port)",
     storm_mode: str = "Severe Squall Line",
     history_steps: int = 4,
-    data_mode: str = "auto",
+    data_mode: Optional[str] = None,
     live_strikes: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
@@ -173,18 +173,27 @@ def ingest_nowcast_multimodal_tensor(
         station_name: Target DWR radar station
         storm_mode: Convective scenario for simulation ('Severe Squall Line', 'Supercell Thunderstorm', etc.)
         history_steps: Number of past time frames (default 4 = -45, -30, -15, 0 min)
-        data_mode: 'auto' (live with scenario augmentation if clear-air), 'live' (strictly real observations),
-                   or 'simulated' (pure synthetic)
+        data_mode: 'real', 'simulation', 'hybrid' (or None to use DATA_CONFIG.data_mode)
         live_strikes: Optional list of buffered Blitzortung real-time strikes
 
     Returns:
         tensor: Shape (history_steps, 32, 32, 4) normalized to [0, 1]
         metadata: Comprehensive atmospheric sounding and observation parameters
     """
+    try:
+        from config.data_config import DATA_CONFIG
+        effective_mode = (data_mode or DATA_CONFIG.data_mode).lower()
+    except Exception:
+        effective_mode = (data_mode or "hybrid").lower()
+
     station = RADAR_STATIONS.get(station_name, RADAR_STATIONS["Chennai DWR (Sriharikota/Port)"])
 
-    # Attempt real-world observation ingestion when requested
-    if data_mode in ("auto", "live"):
+    # Pure simulation mode requested
+    if effective_mode in ("simulation", "simulated"):
+        return _generate_synthetic_tensor(station_name, storm_mode, history_steps)
+
+    # Real or Hybrid mode
+    if effective_mode in ("real", "live", "hybrid", "auto"):
         try:
             from real_data_service import assemble_real_multimodal_tensor
             real_tensor, real_meta = assemble_real_multimodal_tensor(

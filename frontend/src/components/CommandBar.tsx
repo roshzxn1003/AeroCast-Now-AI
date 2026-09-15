@@ -5,6 +5,7 @@ import { useNowcastStore } from '../store/nowcastStore';
 import { Button, ProvenanceBadge } from './ui';
 import { ActiveTab } from '../types/nowcast';
 import { MAJOR_INDIAN_CITIES } from '../utils/weatherInterpreter';
+import { OutputDataSourceSwitcher } from './OutputDataSourceSwitcher';
 
 const PRO_TABS: { id: ActiveTab; label: string }[] = [
   { id: 'nowcast', label: 'Command' },
@@ -31,13 +32,46 @@ export const CommandBar: React.FC = () => {
     selectedCity,
     setSelectedCity,
     setSelectedStation,
+    dataPipelineStatus,
+    loadDataPipelineStatus,
   } = useNowcastStore();
+
+  React.useEffect(() => {
+    void loadDataPipelineStatus();
+    const timer = setInterval(() => {
+      void loadDataPipelineStatus();
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [loadDataPipelineStatus]);
 
   const summary = useLiveStore((s) => s.summary);
   const isLoading = useLiveStore((s) => s.isLoading);
   const refreshAll = useLiveStore((s) => s.refreshAll);
 
   const tabs = uiMode === 'citizen' ? CITIZEN_TABS : PRO_TABS;
+
+  const mode = dataPipelineStatus?.mode ?? 'hybrid';
+  let badgeColor = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+  let dotColor = 'bg-cyan-400';
+  let modeLabel = 'HYBRID FEED';
+
+  if (mode === 'real') {
+    badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+    dotColor = 'bg-emerald-400';
+    modeLabel = 'LIVE DATA';
+  } else if (mode === 'simulation') {
+    badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+    dotColor = 'bg-amber-400';
+    modeLabel = 'SIMULATION';
+  }
+
+  const tooltipText = dataPipelineStatus
+    ? `Data Pipeline: ${dataPipelineStatus.mode.toUpperCase()} (Quality: ${Math.round(dataPipelineStatus.quality_score * 100)}%)\n` +
+      `• Weather: ${dataPipelineStatus.sources.weather.status} (${dataPipelineStatus.sources.weather.provider})\n` +
+      `• Radar: ${dataPipelineStatus.sources.radar.status} (${dataPipelineStatus.sources.radar.provider})\n` +
+      `• Satellite: ${dataPipelineStatus.sources.satellite.status} (${dataPipelineStatus.sources.satellite.provider})\n` +
+      `• Lightning: ${dataPipelineStatus.sources.lightning.status} (${dataPipelineStatus.sources.lightning.provider})`
+    : 'Data Pipeline: Connecting...';
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-line)] bg-[rgba(6,8,11,0.92)] backdrop-blur-md">
@@ -56,10 +90,10 @@ export const CommandBar: React.FC = () => {
         </div>
 
         {/* Dual Mode Switcher: Citizen (Friendly) vs Pro (Meteorologist) */}
-        <div className="flex items-center rounded-lg p-0.5 bg-slate-900 border border-slate-700/80 text-xs">
+        <div className="flex items-center rounded-lg p-0.5 bg-slate-900 border border-slate-700/80 text-xs shrink-0">
           <button
             onClick={() => setUiMode('citizen')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md font-medium transition-all ${
               uiMode === 'citizen'
                 ? 'bg-cyan-500 text-slate-950 font-bold shadow'
                 : 'text-slate-400 hover:text-white'
@@ -67,11 +101,11 @@ export const CommandBar: React.FC = () => {
             title="Switch to Public / Citizen Mode with simple language & safety tips"
           >
             <User className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Public Mode</span>
+            <span className="hidden sm:inline">Citizen</span>
           </button>
           <button
             onClick={() => setUiMode('pro')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md font-medium transition-all ${
               uiMode === 'pro'
                 ? 'bg-cyan-500 text-slate-950 font-bold shadow'
                 : 'text-slate-400 hover:text-white'
@@ -79,13 +113,18 @@ export const CommandBar: React.FC = () => {
             title="Switch to Pro Forecaster Mode with raw radar dBZ & sounding telemetry"
           >
             <Gauge className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Pro Mode</span>
+            <span className="hidden sm:inline">Pro</span>
           </button>
+        </div>
+
+        {/* Global Output Data Source Switcher (All vs Live vs Model) */}
+        <div className="hidden sm:flex items-center pl-2 border-l border-[var(--color-line)] shrink-0">
+          <OutputDataSourceSwitcher size="xs" compact={true} />
         </div>
 
         {/* Citizen Quick City Selector */}
         {uiMode === 'citizen' ? (
-          <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--color-line)]">
+          <div className="hidden md:flex items-center gap-1.5 pl-3 border-l border-[var(--color-line)] shrink-0">
             <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span className="text-xs text-slate-400 font-medium shrink-0">City:</span>
             <select
@@ -96,7 +135,7 @@ export const CommandBar: React.FC = () => {
                 const city = MAJOR_INDIAN_CITIES.find((c) => c.id === cityId);
                 if (city) setSelectedStation(city.stationName);
               }}
-              className="bg-slate-900/90 border border-cyan-500/40 text-cyan-300 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer font-medium"
+              className="bg-slate-900/90 border border-cyan-500/40 text-cyan-300 text-xs rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer font-medium"
             >
               {MAJOR_INDIAN_CITIES.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -106,11 +145,8 @@ export const CommandBar: React.FC = () => {
             </select>
           </div>
         ) : (
-          /* Feed freshness only. Flash rate, storm counts and the most unstable
-             node all live in the rail; repeating them here was the main reason
-             the same figure appeared three times on one screen. */
           summary && (
-            <div className="hidden xl:flex items-center gap-2 pl-4 border-l border-[var(--color-line)]">
+            <div className="hidden xl:flex items-center gap-2 pl-3 border-l border-[var(--color-line)] shrink-0">
               <ProvenanceBadge provenance={summary.lightning_status} />
               <span className="text-[11px] font-mono text-[var(--color-ink-faint)]">
                 {new Date(summary.retrieved_at).toLocaleTimeString([], {
@@ -122,19 +158,28 @@ export const CommandBar: React.FC = () => {
           )
         )}
 
-        <div className="flex-1" />
+        {/* Data Pipeline Mode & Provider Quality Badge */}
+        <div
+          className={`hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold border cursor-help transition-colors shrink-0 ${badgeColor}`}
+          title={tooltipText}
+        >
+          <span className={`w-2 h-2 rounded-full ${mode === 'simulation' ? 'bg-amber-400' : 'animate-pulse ' + dotColor}`} />
+          <span>{modeLabel}</span>
+        </div>
+
+        <div className="flex-1 min-w-[0.5rem]" />
 
         {/* Navigation Tabs */}
-        <nav className="hidden lg:flex items-center gap-0.5" aria-label="Primary">
+        <nav className="hidden lg:flex items-center gap-1 shrink-0" aria-label="Primary">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               aria-current={activeTab === tab.id ? 'page' : undefined}
-              className={`px-3 py-1.5 rounded-[6px] text-[12px] font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
                 activeTab === tab.id
-                  ? 'text-[var(--color-ink)] bg-[var(--color-surface-overlay)] font-semibold'
-                  : 'text-[var(--color-ink-faint)] hover:text-[var(--color-ink-muted)]'
+                  ? 'text-cyan-300 bg-cyan-950/50 border border-cyan-500/40 font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
               }`}
             >
               {tab.label}

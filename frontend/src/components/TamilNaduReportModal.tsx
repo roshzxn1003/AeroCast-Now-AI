@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { StateConvectiveReport, StateDistrictEntry } from '../types/nowcast';
 import { fetchStateConvectiveReport } from '../services/api';
+import { useNowcastStore } from '../store/nowcastStore';
+import { OutputDataSourceSwitcher } from './OutputDataSourceSwitcher';
 
 interface TamilNaduReportModalProps {
   isOpen: boolean;
@@ -43,6 +45,8 @@ export const TamilNaduReportModal: React.FC<TamilNaduReportModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Filters & State
+  const outputDataSource = useNowcastStore((s) => s.outputDataSource);
+  const setOutputDataSource = useNowcastStore((s) => s.setOutputDataSource);
   const [selectedLang, setSelectedLang] = useState<'en' | 'ta' | 'hi'>('en');
   const [searchQuery, setSearchQuery] = useState('');
   const [threatFilter, setThreatFilter] = useState<'ALL' | 'EXTREME' | 'SEVERE' | 'MODERATE' | 'STABLE'>('ALL');
@@ -191,7 +195,7 @@ ISSUED BY: ${data.cap_bulletin.sender}
         <div className="flex items-center justify-between px-5 py-4 border-b border-cyan-950/80 bg-gradient-to-r from-slate-900 via-slate-900/90 to-cyan-950/40 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-950/80 border border-cyan-500/50 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-              <Radio className="w-5 h-5 animate-pulse" />
+              <Radio className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -366,7 +370,7 @@ ISSUED BY: ${data.cap_bulletin.sender}
               <div className="p-5 rounded-xl bg-slate-900/90 border border-cyan-500/30 shadow-xl space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-cyan-400/30" />
                     <h3 className="font-bold text-base text-white flex items-center gap-2 font-mono">
                       <span>OFFICIAL DISASTER MANAGEMENT ADVISORY</span>
                       <span className="text-[10px] font-normal text-slate-400 px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
@@ -576,6 +580,13 @@ ISSUED BY: ${data.cap_bulletin.sender}
 
                   {/* Search and Filters */}
                   <div className="flex flex-wrap items-center gap-2 no-print">
+                    <OutputDataSourceSwitcher
+                      value={outputDataSource}
+                      onChange={setOutputDataSource}
+                      size="xs"
+                      compact={true}
+                    />
+
                     <div className="relative">
                       <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                       <input
@@ -583,7 +594,7 @@ ISSUED BY: ${data.cap_bulletin.sender}
                         placeholder="Search district..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors w-40 sm:w-48"
+                        className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors w-36 sm:w-44"
                       />
                     </div>
 
@@ -611,11 +622,36 @@ ISSUED BY: ${data.cap_bulletin.sender}
                     <thead className="bg-slate-950/80 text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
                       <tr>
                         <th className="py-2.5 px-3">District</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3">Peak dBZ</th>
-                        <th className="py-2.5 px-3">CAPE (J/kg)</th>
-                        <th className="py-2.5 px-3">Wind Gust</th>
-                        <th className="py-2.5 px-3">Storm Proximity</th>
+                        <th className={`py-2.5 px-3 transition-colors ${outputDataSource === 'model' ? 'text-purple-300 font-bold bg-purple-950/30' : ''}`}>
+                          <div className="flex items-center gap-1">
+                            <span>Status</span>
+                            {outputDataSource === 'model' && <span className="text-[9px] px-1 rounded bg-purple-500/30 text-purple-200">MODEL</span>}
+                          </div>
+                        </th>
+                        <th className={`py-2.5 px-3 transition-colors ${outputDataSource === 'live' ? 'text-emerald-300 font-bold bg-emerald-950/30' : ''}`}>
+                          <div className="flex items-center gap-1">
+                            <span>Peak dBZ</span>
+                            {outputDataSource === 'live' && <span className="text-[9px] px-1 rounded bg-emerald-500/30 text-emerald-200">LIVE</span>}
+                          </div>
+                        </th>
+                        <th className={`py-2.5 px-3 transition-colors ${outputDataSource === 'live' ? 'text-emerald-300 font-bold bg-emerald-950/30' : ''}`}>
+                          <div className="flex items-center gap-1">
+                            <span>CAPE (J/kg)</span>
+                            {outputDataSource === 'live' && <span className="text-[9px] px-1 rounded bg-emerald-500/30 text-emerald-200">LIVE</span>}
+                          </div>
+                        </th>
+                        <th className={`py-2.5 px-3 transition-colors ${outputDataSource === 'live' ? 'text-emerald-300 font-bold bg-emerald-950/30' : ''}`}>
+                          <div className="flex items-center gap-1">
+                            <span>Wind Gust</span>
+                            {outputDataSource === 'live' && <span className="text-[9px] px-1 rounded bg-emerald-500/30 text-emerald-200">LIVE</span>}
+                          </div>
+                        </th>
+                        <th className={`py-2.5 px-3 transition-colors ${outputDataSource === 'model' ? 'text-purple-300 font-bold bg-purple-950/30' : ''}`}>
+                          <div className="flex items-center gap-1">
+                            <span>Storm Proximity</span>
+                            {outputDataSource === 'model' && <span className="text-[9px] px-1 rounded bg-purple-500/30 text-purple-200">MODEL</span>}
+                          </div>
+                        </th>
                         <th className="py-2.5 px-3 text-right no-print">Actions</th>
                       </tr>
                     </thead>
@@ -640,7 +676,7 @@ ISSUED BY: ${data.cap_bulletin.sender}
                                 </span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-3">
+                            <td className={`py-2.5 px-3 ${outputDataSource === 'model' ? 'bg-purple-950/15' : ''}`}>
                               <span
                                 className="px-2 py-0.5 rounded text-[10px] font-bold border"
                                 style={{
@@ -652,9 +688,9 @@ ISSUED BY: ${data.cap_bulletin.sender}
                                 {d.threat_level}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3">
+                            <td className={`py-2.5 px-3 ${outputDataSource === 'live' ? 'bg-emerald-950/15' : ''}`}>
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-100">{d.max_reflectivity_dbz}</span>
+                                <span className={`font-bold ${outputDataSource === 'live' ? 'text-emerald-300' : 'text-slate-100'}`}>{d.max_reflectivity_dbz}</span>
                                 <div className="w-12 h-1.5 rounded-full bg-slate-800 overflow-hidden hidden sm:block">
                                   <div
                                     className="h-full rounded-full"
@@ -666,17 +702,17 @@ ISSUED BY: ${data.cap_bulletin.sender}
                                 </div>
                               </div>
                             </td>
-                            <td className="py-2.5 px-3 text-slate-300">
+                            <td className={`py-2.5 px-3 text-slate-300 ${outputDataSource === 'live' ? 'bg-emerald-950/15 text-emerald-200 font-semibold' : ''}`}>
                               {Math.round(d.cape_j_kg)}
                             </td>
-                            <td className="py-2.5 px-3 text-slate-300">
+                            <td className={`py-2.5 px-3 text-slate-300 ${outputDataSource === 'live' ? 'bg-emerald-950/15 text-emerald-200 font-semibold' : ''}`}>
                               {d.wind_gust_kmh} km/h
                             </td>
-                            <td className="py-2.5 px-3">
+                            <td className={`py-2.5 px-3 ${outputDataSource === 'model' ? 'bg-purple-950/15 text-purple-200 font-semibold' : ''}`}>
                               {d.distance_to_core_km != null ? (
-                                <span className="text-slate-300">
+                                <span className={outputDataSource === 'model' ? 'text-purple-200' : 'text-slate-300'}>
                                   {d.distance_to_core_km} km{' '}
-                                  <span className="text-slate-500">
+                                  <span className={outputDataSource === 'model' ? 'text-purple-400 font-bold' : 'text-slate-500'}>
                                     {d.eta_minutes ? `(~${d.eta_minutes}m)` : ''}
                                   </span>
                                 </span>

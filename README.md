@@ -109,6 +109,11 @@ pip install -r backend/requirements.txt
 
 ### 2. Launch FastAPI REST Server & React Frontend
 
+Copy `.env.example` to `.env` to configure your data mode (`hybrid`, `real`, or `simulation`):
+```bash
+cp .env.example .env
+```
+
 **Backend REST Server:**
 ```bash
 cd backend
@@ -122,23 +127,27 @@ npm install
 npm run dev
 ```
 
-### 3. Launch the Streamlit Pro Dashboard (Alternative UI)
+### 3. Operational Data Modes
+Configure `DATA_MODE` in `.env`:
+* **`DATA_MODE=hybrid` (Recommended)**: Fuses real-time IMD DWR/RainViewer radar, INSAT-3D/3DR satellite, Blitzortung lightning, and Open-Meteo convective profiles with AI nowcasting models. Automatically falls back to procedural simulation if sensors are offline.
+* **`DATA_MODE=real`**: Strict live observation ingestion mode. If live feeds are unavailable, logs honest data quality issues rather than synthesizing data.
+* **`DATA_MODE=simulation`**: Offline simulation mode using procedural convective storm scenarios (Squall Lines, Supercells, Multi-Cell Clusters).
+
+### 4. Run the Automated Test Suites
 ```bash
-cd backend
-streamlit run app.py
+# Test the complete real data ingestion & preprocessing pipeline
+PYTHONPATH=backend python -m unittest backend/test_data_pipeline.py
+
+# Test model nowcasting & 734 Indian district gazetteer services
+PYTHONPATH=backend python -m unittest backend/test_real_data.py backend/test_district_nowcast.py backend/test_nowcasting.py
 ```
 
-### 4. Run the Automated Test Suite
+### 5. Check Live API Connectivity & Keys
+To verify real-time connectivity to all meteorological feeds (Open-Meteo, RainViewer, INSAT-3D, Blitzortung, and IMD) in one command:
 ```bash
-cd backend
-python -m unittest test_nowcasting.py test_pipeline.py
+python backend/check_apis.py
 ```
-
-### 5. Retrain the ConvLSTM Neural Model (Optional)
-```bash
-cd backend
-python train_nowcasting_model.py
-```
+> For complete instructions on how to request an official IMD API key, register for ISRO MOSDAC satellite datasets, or query our interactive Swagger UI (`http://localhost:8000/docs`), read the [**API Access & Integration Guide**](docs/API_ACCESS_GUIDE.md).
 
 ---
 
@@ -146,40 +155,42 @@ python train_nowcasting_model.py
 
 ```
 AeroCast-Now-AI/
+├── .env.example                   # Environment configuration template
+├── docs/
+│   └── REAL_DATA_PIPELINE.md      # Comprehensive data ingestion & preprocessing architecture doc
 ├── backend/                       # Python Backend & Deep Learning Services
-│   ├── api_server.py              # FastAPI High-Performance REST API Layer (14 endpoints)
-│   ├── app.py                     # Streamlit Meteorological Dashboard
-│   ├── live_data_service.py       # Real-time Blitzortung LDN WebSocket & Open-Meteo Ingest
+│   ├── config/                    # Data Configuration & Directory Provisioning
+│   │   ├── __init__.py
+│   │   └── data_config.py         # Centralized DataConfig, TTL, URLs & DATA_MODE
+│   ├── data_ingestion/            # Ingestion Layer (Modular Data Providers)
+│   │   ├── __init__.py
+│   │   ├── base.py                # Abstract provider interfaces & NormalizedObservation schema
+│   │   ├── weather_ingest.py      # IMD API & Open-Meteo HR Convective Providers
+│   │   ├── radar_ingest.py        # IMD DWR GIF decoder & RainViewer Global Mosaic
+│   │   ├── satellite_ingest.py    # ISRO INSAT-3D/3DR 10.8µm TIR & 6.7µm WV Imager
+│   │   └── lightning_ingest.py    # Blitzortung LDN density grid generator
+│   ├── preprocessing/             # Meteorological Preprocessing & Cleaning Layer
+│   │   ├── __init__.py
+│   │   ├── cleaning.py            # Physical boundary validation & quality scoring
+│   │   ├── interpolation.py       # 15-minute cadence time alignment
+│   │   ├── normalization.py       # Min-Max feature scaling for ConvLSTM2D
+│   │   └── feature_engineering.py # 4D Multimodal Tensor assembly (Batch, 4, 32, 32, 4)
+│   ├── api_server.py              # FastAPI Server (/api/data/*, /api/nowcast, /api/v1/districts/*)
 │   ├── nowcasting_engine.py       # ResAtt-ConvLSTM2D Model, SCIT Tracker & 2σ Lightning Jump Core
-│   ├── observation_service.py     # Multi-Modal Ingestion Simulator (DWR Radar, INSAT-3D, LDN, NWP)
-│   ├── weather_service.py         # Point-station weather forecasting & 1D LSTM model
-│   ├── train_nowcasting_model.py  # ConvLSTM Training Pipeline with Weighted Convective Loss
-│   ├── train_model.py             # 1D LSTM Training Pipeline
-│   ├── test_nowcasting.py         # Primary Automated Test Suite (7/7 Passing)
-│   ├── test_pipeline.py           # Secondary Pipeline Test Suite (7/7 Passing)
-│   ├── requirements.txt           # Python dependency manifest (FastAPI, TensorFlow, websockets, etc.)
-│   ├── Dockerfile                 # Backend container deployment recipe
+│   ├── observation_service.py     # Multi-Modal Observation Service (Hybrid/Real/Simulation)
+│   ├── test_data_pipeline.py      # Comprehensive Pipeline Test Suite (15/15 Passing)
+│   ├── test_nowcasting.py         # Nowcasting Test Suite (7/7 Passing)
+│   ├── test_real_data.py          # Real Data Integration Test Suite (7/7 Passing)
+│   ├── test_district_nowcast.py   # District Nowcast Test Suite (14/14 Passing)
 │   └── models/                    # AI Checkpoints & Scalers
-│       ├── convlstm_nowcaster.keras # Trained Spatio-Temporal ConvLSTM Model Checkpoint (191K params)
-│       ├── model_metadata.json      # Model metrics and CSI/POD/FAR skill scores
-│       ├── weather_lstm.keras       # 1D Synoptic LSTM model checkpoint
-│       ├── scaler.pkl               # Feature scaler
-│       ├── scaler_params.json       # Scaler metadata
-│       └── training_performance.png # Convergence loss plot
+│       └── convlstm_nowcaster.keras # Trained Spatio-Temporal ConvLSTM Model Checkpoint (191K params)
 ├── frontend/                      # React 19 + TypeScript + Vite 6 Application
-│   ├── public/
-│   │   ├── textures/              # Offline photorealistic Earth textures, clouds & starry sky
-│   │   └── geo/                   # Indian states & national boundaries GeoJSON
 │   ├── src/
-│   │   ├── components/            # CommandBar, LightningGlobe (3D WebGL), RadarViewport, BottomNav
-│   │   ├── effects/               # lightningGenerator.ts (3D fractal bolts) & thunderAudio.ts (synthesizer)
-│   │   ├── utils/                 # weatherInterpreter.ts (Plain-English safety translator)
-│   │   ├── pages/                 # CommandScreen, AlertsScreen, StormsScreen, RiskScreen, MoreScreen
-│   │   ├── services/              # REST API Client with robust offline simulated fallback
+│   │   ├── components/            # CommandBar (with Data Mode Badge), 3D Globe, Radar Viewport
 │   │   ├── store/                 # Zustand global reactive state (nowcastStore & liveStore)
-│   │   └── types/                 # Meteorological data types and interfaces
-│   ├── package.json               # React 19, Three.js, Globe.gl, Tailwind v4, Lucide, Recharts
-│   └── vite.config.ts             # Vite build configuration with API reverse proxy
-└── README.md                      # Comprehensive Documentation & Architecture Guide
+│   │   ├── types/                 # Meteorological data types and schemas
+│   │   └── services/              # REST API Client (with /data/status & /data/current)
+│   └── package.json               # React 19, Three.js, Globe.gl, Tailwind v4
+└── README.md                      # Architecture, Quickstart & Scientific Documentation
 ```
 

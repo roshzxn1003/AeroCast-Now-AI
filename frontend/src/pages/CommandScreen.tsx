@@ -19,6 +19,7 @@ import {
 } from '../components/LiveDomainPanel';
 import { useLiveStore } from '../store/liveStore';
 import { useNowcastStore } from '../store/nowcastStore';
+import { OutputDataSourceSwitcher } from '../components/OutputDataSourceSwitcher';
 import { SEVERITY_COLOR } from '../design/tokens';
 import {
   assessThunderstormThreat,
@@ -52,6 +53,7 @@ export const CommandScreen: React.FC = () => {
     setSelectedCity,
     setSelectedStation,
     setActiveTab,
+    outputDataSource,
   } = useNowcastStore();
 
   const [stateReportSlug, setStateReportSlug] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export const CommandScreen: React.FC = () => {
         <div className="panel p-3 bg-gradient-to-r from-slate-900 via-cyan-950/40 to-slate-900 border border-cyan-500/30 rounded-xl shadow-lg flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
-              <Radio className="w-4 h-4 animate-pulse" />
+              <Radio className="w-4 h-4" />
             </div>
             <div>
               <div className="text-xs font-bold text-white flex items-center gap-1.5 font-mono">
@@ -109,34 +111,85 @@ export const CommandScreen: React.FC = () => {
           </button>
         </div>
 
+        {/* Rail Feed Indicator & Quick Toggle */}
+        <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/90 shadow-sm">
+          <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="text-slate-400">Feed:</span>
+            <span
+              className={`font-semibold px-1.5 py-0.5 rounded text-[10px] ${
+                outputDataSource === 'all'
+                  ? 'bg-slate-800 text-cyan-300 border border-white/10'
+                  : outputDataSource === 'live'
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-purple-950/80 text-purple-300 border border-purple-500/40'
+              }`}
+            >
+              {outputDataSource === 'all'
+                ? 'All (Hybrid)'
+                : outputDataSource === 'live'
+                ? 'Live Obs'
+                : 'AI Model'}
+            </span>
+          </div>
+          <OutputDataSourceSwitcher size="xs" compact={true} />
+        </div>
+
         {uiMode === 'citizen' ? (
           <>
-            <ThreatHero threat={threat} />
-            <CityRadarCard
-              currentCity={currentCity}
-              selectedCity={selectedCity}
-              onSelectCity={(id) => {
-                setSelectedCity(id);
-                const c = MAJOR_INDIAN_CITIES.find((item) => item.id === id);
-                if (c) setSelectedStation(c.stationName);
-              }}
-              maxDbz={maxDbz}
-              hasJump={hasJump}
-            />
+            {(outputDataSource === 'all' || outputDataSource === 'model') && (
+              <ThreatHero threat={threat} />
+            )}
+            {(outputDataSource === 'all' || outputDataSource === 'live') && (
+              <CityRadarCard
+                currentCity={currentCity}
+                selectedCity={selectedCity}
+                onSelectCity={(id) => {
+                  setSelectedCity(id);
+                  const c = MAJOR_INDIAN_CITIES.find((item) => item.id === id);
+                  if (c) setSelectedStation(c.stationName);
+                }}
+                maxDbz={maxDbz}
+                hasJump={hasJump}
+              />
+            )}
             <SafetyCard actions={threat.safetyActions} />
-            <ExplainerCard />
+            {(outputDataSource === 'all' || outputDataSource === 'model') && (
+              <ExplainerCard />
+            )}
           </>
         ) : (
           <>
-            <RailSection label="Nowcast" />
-            <LightningJumpBanner />
-            <StormCellsCard cells={activeCells} onOpenTracker={() => setActiveTab('storms')} />
-            <ModelReportPanel />
+            {(outputDataSource === 'all' || outputDataSource === 'model') && (
+              <>
+                <RailSection label="Nowcast (AI Model)" />
+                <LightningJumpBanner />
+                <StormCellsCard cells={activeCells} onOpenTracker={() => setActiveTab('storms')} />
+                <ModelReportPanel />
+              </>
+            )}
 
-            <RailSection label="Observations" />
-            <LiveDomainPanel />
-            <NodeDetailPanel />
-            <NetworkStatusPanel />
+            {(outputDataSource === 'all' || outputDataSource === 'live') && (
+              <>
+                <RailSection label="Observations (Live Telemetry)" />
+                <LiveDomainPanel />
+                <NodeDetailPanel />
+                <NetworkStatusPanel />
+              </>
+            )}
+
+            {outputDataSource !== 'all' && (
+              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono flex items-center justify-between text-slate-400">
+                <span>
+                  Filtered: {outputDataSource === 'model' ? 'AI Predictions' : 'Live Sensors'} only
+                </span>
+                <button
+                  onClick={() => useNowcastStore.getState().setOutputDataSource('all')}
+                  className="text-cyan-400 hover:text-cyan-300 text-[11px] font-semibold underline underline-offset-2"
+                >
+                  Show All
+                </button>
+              </div>
+            )}
           </>
         )}
       </aside>
@@ -300,21 +353,46 @@ const SafetyCard: React.FC<{ actions: string[] }> = ({ actions }) => (
   </section>
 );
 
-const ExplainerCard: React.FC = () => (
-  <section className="panel">
-    <div className="p-3.5">
-      <h2 className="text-[13px] font-medium flex items-center gap-1.5 mb-1.5">
-        <Info className="w-3.5 h-3.5 text-[var(--color-ink-faint)]" />
-        How AeroCast works
-      </h2>
-      <p className="text-[12px] text-[var(--color-ink-muted)] leading-relaxed">
-        AeroCast fuses IMD Doppler radar, ISRO INSAT-3D satellite imagery and
-        ground lightning sensors. A ResAtt-ConvLSTM2D network predicts
-        thunderstorm movement 15 to 120 minutes ahead.
-      </p>
-    </div>
-  </section>
-);
+const ExplainerCard: React.FC = () => {
+  const setActiveTab = useNowcastStore((s) => s.setActiveTab);
+  const setMoreSubScreen = useNowcastStore((s) => s.setMoreSubScreen);
+
+  return (
+    <section className="panel">
+      <div className="p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[13px] font-medium flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 text-[var(--color-ink-faint)]" />
+            Operational Engine
+          </h2>
+          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            ONLINE
+          </span>
+        </div>
+        <p className="text-[12px] text-[var(--color-ink-muted)] leading-relaxed">
+          AeroCast fuses IMD Doppler radar, ISRO INSAT-3D satellite imagery and
+          ground lightning sensors. A ResAtt-ConvLSTM2D neural network predicts
+          convective evolution 15 to 120 minutes ahead.
+        </p>
+        <div className="pt-2 border-t border-[var(--color-line-faint)] flex items-center justify-between text-xs">
+          <span className="text-[11px] font-mono text-slate-400">
+            ResAtt-ConvLSTM2D · CSI 0.837
+          </span>
+          <button
+            onClick={() => {
+              setMoreSubScreen('ai_model');
+              setActiveTab('more');
+            }}
+            className="text-[11px] text-cyan-400 hover:text-cyan-300 font-medium hover:underline"
+          >
+            Model & Training Guide →
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 // -----------------------------------------------------------------------------
 // Pro-mode cards

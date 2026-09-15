@@ -172,7 +172,7 @@ export interface SystemHealth {
 }
 
 export type ChannelMode = 'dbz' | 'vil' | 'tir' | 'flash';
-export type StormScenario = 'Severe Squall Line' | 'Supercell Thunderstorm' | 'Multi-Cell Cluster';
+export type StormScenario = 'Severe Squall Line' | 'Supercell Thunderstorm' | 'Multi-Cell Cluster' | 'Live Observation';
 export type ActiveTab = 'nowcast' | 'alerts' | 'storms' | 'risk' | 'more';
 export type MoreSubScreen = 'overview' | 'lightning' | 'radar_sat' | 'ai_model' | 'data_sources' | 'system_health' | 'historical' | 'settings' | 'about';
 
@@ -181,6 +181,7 @@ export type MoreSubScreen = 'overview' | 'lightning' | 'radar_sat' | 'ai_model' 
 // =============================================================================
 
 export type Provenance = 'LIVE' | 'LIVE-DERIVED' | 'MODEL' | 'STALE' | 'UNAVAILABLE';
+export type OutputDataSource = 'all' | 'live' | 'model';
 
 /** One live convective sounding node in the Indian domain. */
 export interface ConvectiveNode {
@@ -513,6 +514,64 @@ export interface StateConvectiveReport {
     hi?: string;
   };
   cap_bulletin: StateReportCapBulletin;
+}
+
+// =============================================================================
+// REAL DATA PIPELINE & QUALITY SCHEMAS
+// =============================================================================
+
+export interface DataPipelineProviderStatus {
+  status: 'connected' | 'degraded' | 'buffering' | 'disconnected';
+  provider: string;
+  last_update: string;
+  buffered_strikes?: number;
+}
+
+export interface DataPipelineStatus {
+  mode: 'simulation' | 'real' | 'hybrid';
+  sources: {
+    weather: DataPipelineProviderStatus;
+    radar: DataPipelineProviderStatus;
+    satellite: DataPipelineProviderStatus;
+    lightning: DataPipelineProviderStatus;
+  };
+  quality_score: number;
+  timestamp: string;
+}
+
+export interface DataQualityReportFrontend {
+  valid: boolean;
+  missing_fields: string[];
+  source: string;
+  timestamp: string;
+  quality_score: number;
+  issues: string[];
+  is_stale: boolean;
+  is_interpolated: boolean;
+}
+
+export interface NormalizedObservationFrontend {
+  timestamp: string;
+  latitude: number;
+  longitude: number;
+  station_id: string;
+  station_name: string;
+  temperature_c?: number;
+  relative_humidity_pct?: number;
+  pressure_hpa?: number;
+  wind_speed_ms?: number;
+  wind_direction_deg?: number;
+  rainfall_mm_h?: number;
+  cloud_cover_pct?: number;
+  cape_j_kg?: number;
+  cin_j_kg?: number;
+  lifted_index?: number;
+  radar_max_dbz?: number;
+  vil_kg_m2?: number;
+  satellite_ir_temperature_c?: number;
+  satellite_water_vapor_c?: number;
+  flash_rate_per_minute?: number;
+  quality: DataQualityReportFrontend;
 }
 
 
