@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNowcastStore } from '../store/nowcastStore';
-import { fetchLightningJumpTimeseries, fetchDistrictsSummary } from '../services/api';
-import { FlashTimeSeriesPoint, DistrictSummaryResponse } from '../types/nowcast';
+import { fetchLightningJumpTimeseries, fetchDistrictsSummary, fetchActiveAlerts, fetchCurrentRisk, acknowledgeAlert } from '../services/api';
+import { FlashTimeSeriesPoint, DistrictSummaryResponse, AlertItem, RiskAssessment, SectorImpact, DecisionSupportAction } from '../types/nowcast';
 import {
   Zap,
   Clock,
@@ -35,6 +35,8 @@ export const AlertsScreen: React.FC = () => {
   const [showJson, setShowJson] = useState(false);
   const [districtSummary, setDistrictSummary] = useState<DistrictSummaryResponse | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [activeAlerts, setActiveAlerts] = useState<AlertItem[]>([]);
+  const [riskAssessment, setRiskAssessment] = useState<RiskAssessment | null>(null);
 
   useEffect(() => {
     fetchLightningJumpTimeseries(hasJump).then((res) => {
@@ -48,7 +50,38 @@ export const AlertsScreen: React.FC = () => {
       if (res) setDistrictSummary(res);
       setLoadingSummary(false);
     });
+    
+    // Fetch Phase 7 Data
+    fetchActiveAlerts().then((res) => {
+      if (res && res.active_alerts) {
+        setActiveAlerts(res.active_alerts);
+      }
+    });
+    fetchCurrentRisk().then((res) => {
+      if (res && res.risk_assessment) {
+        setRiskAssessment(res.risk_assessment);
+      }
+    });
   }, []);
+
+  // Sync with nowcastData if it contains the new fields
+  useEffect(() => {
+    if (nowcastData?.active_alerts && nowcastData.active_alerts.length > 0) {
+      setActiveAlerts(nowcastData.active_alerts);
+    }
+    if (nowcastData?.risk_assessment) {
+      setRiskAssessment(nowcastData.risk_assessment);
+    }
+  }, [nowcastData]);
+
+  const handleAcknowledgeAlert = async (alertId: string) => {
+    const success = await acknowledgeAlert(alertId);
+    if (success) {
+      setActiveAlerts((prev) =>
+        prev.map((a) => (a.alert_id === alertId ? { ...a, acknowledged: true } : a))
+      );
+    }
+  };
 
   if (!nowcastData) {
     return (
@@ -106,6 +139,147 @@ export const AlertsScreen: React.FC = () => {
           {hasJump ? '🚨 Convective Surge Active' : '🟢 Normal State'}
         </button>
       </div>
+
+      {/* PHASE 7: AI RISK ASSESSMENT & ACTIVE ALERTS */}
+      {riskAssessment && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Risk Assessment */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="bg-[var(--color-surface-base)] border border-[var(--color-line)] rounded-[10px] p-4 space-y-4 shadow-lg">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-bold text-sm text-[var(--color-ink)]">AI Risk Assessment</h3>
+              </div>
+              
+              <div className="flex items-center justify-between border-b border-[var(--color-line)] pb-4">
+                <div>
+                  <div className="text-3xl font-bold font-mono" style={{ color: riskAssessment.color || '#ef4444' }}>
+                    {riskAssessment.overall_score} <span className="text-sm text-[var(--color-ink-muted)]">/ 100</span>
+                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-wider mt-1" style={{ color: riskAssessment.color || '#ef4444' }}>
+                    {riskAssessment.risk_level}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-[var(--color-ink-muted)]">Confidence</div>
+                  <div className="text-sm font-bold text-[var(--color-ink)]">{riskAssessment.confidence_score}%</div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-xs font-medium text-[var(--color-ink)]">{riskAssessment.summary}</div>
+                <div className="text-[11px] text-[var(--color-ink-muted)] bg-black/20 p-2 rounded">
+                  <span className="font-bold text-amber-400">Primary Driver: </span>
+                  {riskAssessment.primary_driver}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <div className="text-[10px] font-bold text-[var(--color-ink-muted)] uppercase tracking-wider">Risk Components</div>
+                {riskAssessment.components?.map((comp, idx) => (
+                  <div key={idx} className="bg-black/30 p-2 rounded border border-[var(--color-line-faint)] space-y-1">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="font-medium text-[var(--color-ink)]">{comp.name}</span>
+                      <span className="font-mono text-[var(--color-ink-muted)]">{comp.raw_value} {comp.unit}</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                      <div className="bg-indigo-400 h-1.5 rounded-full" style={{ width: `${comp.normalized_score}%` }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[9px] text-[var(--color-ink-muted)] italic text-center pt-2 border-t border-[var(--color-line)]">
+                {riskAssessment.disclaimer}
+              </div>
+            </div>
+          </div>
+
+          {/* Active Alerts & Sector Impacts */}
+          <div className="lg:col-span-7 space-y-4">
+            {activeAlerts && activeAlerts.length > 0 ? (
+              <div className="bg-[var(--color-surface-base)] border border-[var(--color-line)] rounded-[10px] p-4 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                    <h3 className="font-bold text-sm text-[var(--color-ink)]">Active AI Alerts ({activeAlerts.filter(a => !a.acknowledged).length})</h3>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin">
+                  {activeAlerts.map((alert) => (
+                    <div key={alert.alert_id} className={`p-3 rounded-lg border ${alert.acknowledged ? 'bg-black/20 border-[var(--color-line-faint)] opacity-70' : 'bg-red-500/10 border-red-500/30'} space-y-2`}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">
+                              {alert.risk_level}
+                            </span>
+                            <span className="text-[10px] text-[var(--color-ink-muted)] font-mono">{alert.category}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-red-400 mt-1">{alert.headline}</h4>
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-1">
+                          <span className="text-xs font-mono text-amber-400">+{alert.lead_time_min}m</span>
+                          {!alert.acknowledged && (
+                            <button 
+                              onClick={() => handleAcknowledgeAlert(alert.alert_id)}
+                              className="text-[10px] bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded transition-colors"
+                            >
+                              Acknowledge
+                            </button>
+                          )}
+                          {alert.acknowledged && (
+                            <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Ack
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-[var(--color-ink-muted)] leading-relaxed">{alert.description}</p>
+                      
+                      {/* Impacts */}
+                      {alert.impacts && alert.impacts.length > 0 && (
+                        <div className="pt-2 border-t border-[var(--color-line-faint)] grid grid-cols-2 gap-2">
+                          {alert.impacts.map((impact, i) => (
+                            <div key={i} className="bg-black/40 p-1.5 rounded border border-[var(--color-line-faint)]">
+                              <div className="text-[10px] font-bold text-orange-300">{impact.sector}</div>
+                              <div className="text-[9px] text-[var(--color-ink-muted)]">{impact.headline}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Actions */}
+                      {alert.actions && alert.actions.length > 0 && (
+                        <div className="pt-2">
+                          <div className="text-[10px] font-bold text-[var(--color-ink-muted)] uppercase mb-1">Decision Support</div>
+                          <div className="space-y-1">
+                            {alert.actions.map((act) => (
+                              <div key={act.action_id} className="flex items-start gap-1.5 text-[10px]">
+                                <Activity className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="text-[var(--color-ink)] block">{act.action}</span>
+                                  <span className="text-[8.5px] text-[var(--color-ink-muted)] block mt-0.5">Target: {act.target_audience}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--color-surface-base)] border border-[var(--color-line)] rounded-[10px] p-6 text-center shadow-lg">
+                <ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                <h3 className="font-bold text-sm text-[var(--color-ink)]">No Active Alerts</h3>
+                <p className="text-xs text-[var(--color-ink-muted)] mt-1">Conditions are currently below alert thresholds.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Responsive Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">

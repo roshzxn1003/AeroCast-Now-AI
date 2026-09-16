@@ -17,6 +17,10 @@ import {
   StateConvectiveReport,
   DataPipelineStatus,
   NormalizedObservationFrontend,
+  LivePipelineStatus,
+  AlertItem,
+  RiskAssessment,
+  AlertStatsResponse
 } from '../types/nowcast';
 
 const API_BASE = '/api';
@@ -123,6 +127,39 @@ export async function fetchNowcast(
   }
 }
 
+export async function fetchLiveNowcast(
+  station: string = 'Chennai DWR (Sriharikota/Port)',
+  stormMode: string = 'Severe Squall Line',
+  forecastSteps: number = 4,
+  dataMode: string = 'hybrid'
+): Promise<NowcastResponse> {
+  try {
+    const params = new URLSearchParams({
+      station,
+      storm_mode: stormMode,
+      forecast_steps: String(forecastSteps),
+      data_mode: dataMode,
+    });
+    const res = await fetch(`${API_BASE}/live/nowcast?${params.toString()}`);
+    if (!res.ok) throw new Error(`Live nowcast fetch failed: ${res.statusText}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('Falling back from live nowcast to standard nowcast:', err);
+    return fetchNowcast(station, stormMode, forecastSteps);
+  }
+}
+
+export async function fetchLiveStatus(): Promise<LivePipelineStatus | null> {
+  try {
+    const res = await fetch(`${API_BASE}/live/status`);
+    if (!res.ok) throw new Error(`Live status fetch failed: ${res.statusText}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('Live status fetch error:', err);
+    return null;
+  }
+}
+
 export async function fetchLightningJumpTimeseries(hasJump: boolean = true): Promise<{
   jump: LightningJumpResult;
   timeseries: FlashTimeSeriesPoint[];
@@ -186,6 +223,61 @@ export async function fetchStateConvectiveReport(stateSlug: string = 'tamil-nadu
   }
 }
 
+
+// ==============================================================================
+// PHASE 7: AI ALERTS & DECISION SUPPORT API
+// ==============================================================================
+
+export async function fetchActiveAlerts(): Promise<{ active_alerts: AlertItem[]; count: number }> {
+  try {
+    const res = await fetch(`${API_BASE}/alerts/active`);
+    if (!res.ok) throw new Error(`Active alerts fetch failed: ${res.statusText}`);
+    return await res.json();
+  } catch {
+    return { active_alerts: [], count: 0 };
+  }
+}
+
+export async function fetchAlertHistory(limit: number = 50): Promise<{ history: AlertItem[]; count: number }> {
+  try {
+    const res = await fetch(`${API_BASE}/alerts/history?limit=${limit}`);
+    if (!res.ok) throw new Error(`Alert history fetch failed: ${res.statusText}`);
+    return await res.json();
+  } catch {
+    return { history: [], count: 0 };
+  }
+}
+
+export async function acknowledgeAlert(alertId: string, operator: string = 'operator'): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/alerts/${encodeURIComponent(alertId)}/acknowledge?operator=${encodeURIComponent(operator)}`, {
+      method: 'POST',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchCurrentRisk(): Promise<{ risk_assessment: RiskAssessment | null }> {
+  try {
+    const res = await fetch(`${API_BASE}/alerts/risk`);
+    if (!res.ok) throw new Error(`Risk fetch failed: ${res.statusText}`);
+    return await res.json();
+  } catch {
+    return { risk_assessment: null };
+  }
+}
+
+export async function fetchAlertStats(): Promise<AlertStatsResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/alerts/stats`);
+    if (!res.ok) throw new Error(`Alert stats fetch failed: ${res.statusText}`);
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 // ==============================================================================
 // REALISTIC FALLBACK SIMULATOR (used when backend is offline or loading)

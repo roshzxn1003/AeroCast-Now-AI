@@ -110,12 +110,29 @@ export interface HistoryGrid {
 
 export interface NowcastResponse {
   data_note: string;
+  provenance?: string;
+  data_mode?: string;
+  mode?: string;
+  sequence_ready?: boolean;
+  observation_timestamp?: string;
+  prediction_timestamp?: string;
+  freshness?: {
+    overall_status?: string;
+    checked_at?: string;
+    summary_message?: string;
+    streams?: Record<string, {
+      stream_name: string;
+      status: string;
+      age_minutes: number;
+      source: string;
+    }>;
+  };
   inference_time_ms: number;
   station: string;
   location: { lat: number; lon: number };
   state: string;
   storm_mode: string;
-  timestamp: string;
+  timestamp?: string;
   observation: {
     max_dbz: number;
     max_vil: number;
@@ -130,7 +147,102 @@ export interface NowcastResponse {
   forecast_grids: ForecastGrid[];
   lightning_jump: LightningJumpResult;
   cap_bulletin: CAPBulletin;
+  raw_metadata?: Record<string, any>;
+  risk_assessment?: RiskAssessment;
+  active_alerts?: AlertItem[];
 }
+
+// Phase 7: Risk Assessment & Alert Types
+export interface RiskComponent {
+  name: string;
+  weight: number;
+  raw_value: number;
+  unit: string;
+  normalized_score: number;
+  weighted_score: number;
+  level: string;
+  explanation: string;
+}
+
+export interface RiskAssessment {
+  overall_score: number;
+  risk_level: string;
+  color: string;
+  components: RiskComponent[];
+  summary: string;
+  primary_driver: string;
+  is_alert_triggered: boolean;
+  confidence_score: number;
+  disclaimer: string;
+}
+
+export interface SectorImpact {
+  sector: string;
+  severity: string;
+  headline: string;
+  hazards: string[];
+  affected_assets: string[];
+  onset_lead_time_min: number;
+  duration_min: number;
+}
+
+export interface DecisionSupportAction {
+  action_id: string;
+  sector: string;
+  priority: string;
+  action: string;
+  lead_time_min: number;
+  target_audience: string;
+}
+
+export interface AlertItem {
+  alert_id: string;
+  timestamp: string;
+  station: string;
+  target_lat: number;
+  target_lon: number;
+  risk_level: string;
+  category: string;
+  headline: string;
+  description: string;
+  trigger_reason: string;
+  lead_time_min: number;
+  valid_until: string;
+  cell_id?: string;
+  impacts: SectorImpact[];
+  actions: DecisionSupportAction[];
+  risk_assessment: RiskAssessment;
+  acknowledged: boolean;
+  ack_timestamp?: string;
+  disclaimer: string;
+}
+
+export interface AlertStatsResponse {
+  active_count: number;
+  historical_count: number;
+  by_severity: Record<string, number>;
+  timestamp: string;
+}
+
+export interface LivePipelineStatus {
+  status: string;
+  timestamp: string;
+  active_model_mode: string;
+  model_checkpoint: string;
+  model_parameters: number;
+  scaler_fitted: boolean;
+  buffer: {
+    capacity: number;
+    current_frames: number;
+    sequence_ready: boolean;
+    cadence_minutes: number;
+  };
+  providers: Record<string, {
+    name: string;
+    source_type: string;
+  }>;
+}
+
 
 export interface FlashTimeSeriesPoint {
   minutes_ago: number;
@@ -180,7 +292,7 @@ export type MoreSubScreen = 'overview' | 'lightning' | 'radar_sat' | 'ai_model' 
 // LIVE OBSERVATION FEEDS
 // =============================================================================
 
-export type Provenance = 'LIVE' | 'LIVE-DERIVED' | 'MODEL' | 'STALE' | 'UNAVAILABLE';
+export type Provenance = 'LIVE' | 'LIVE_REAL_DATA' | 'HYBRID' | 'SIMULATION' | 'LIVE-DERIVED' | 'MODEL' | 'STALE' | 'UNAVAILABLE';
 export type OutputDataSource = 'all' | 'live' | 'model';
 
 /** One live convective sounding node in the Indian domain. */

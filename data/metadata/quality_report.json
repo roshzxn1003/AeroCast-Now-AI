@@ -1,0 +1,16 @@
+{
+  "total_samples": 141232,
+  "valid_samples": 141232,
+  "rejected_samples": 0,
+  "acceptance_rate_pct": 100.0,
+  "reasons": {
+    "missing_radar": 0,
+    "missing_satellite": 0,
+    "missing_lightning": 0,
+    "invalid_timestamp": 0,
+    "excessive_missing_pixels": 0,
+    "impossible_physical_value": 0,
+    "incomplete_sequence": 0,
+    "other": 0
+  }
+}

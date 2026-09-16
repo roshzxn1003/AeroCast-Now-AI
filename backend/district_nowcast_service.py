@@ -252,8 +252,13 @@ def classify_threat_level(max_dbz: float, max_vil: float, min_tir: float, flash_
 def compute_convective_impacts(max_dbz: float, max_vil: float, flash_rate: float, shear_kts: float) -> Dict[str, Any]:
     """Derives multi-sector physical hazard metrics from radar, VIL, and lightning."""
     # Marshall-Palmer Z-R relation for convective rain: Z = 200 * R^1.6
-    z_linear = 10.0 ** (max_dbz / 10.0) if max_dbz > 15.0 else 0.0
+    # Meteorological hail cap: Reflectivity above 53.0 dBZ in severe convective cores is
+    # dominated by hail rather than liquid raindrops. Standard operational radar algorithms
+    # (e.g. WSR-88D PPS / IMD DWR) apply a 53-55 dBZ cap to prevent unphysical rain rates.
+    capped_dbz = min(max_dbz, 53.0)
+    z_linear = 10.0 ** (capped_dbz / 10.0) if capped_dbz > 15.0 else 0.0
     rain_rate_mmh = round(float((z_linear / 200.0) ** (1.0 / 1.6)), 1) if z_linear > 0 else 0.0
+    rain_rate_mmh = min(rain_rate_mmh, 150.0)
 
     # Hail probability proxy based on VIL density and core reflectivity
     hail_prob_pct = int(min(98, max(0, (max_dbz - 42.0) * 4.5 + (max_vil - 15.0) * 2.0))) if max_dbz >= 40.0 else 0

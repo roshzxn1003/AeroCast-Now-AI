@@ -17,9 +17,15 @@ __pycache__/
 .DS_Store
 *.log
 
+# Environment & Runtime PIDs
+.env
+.pids/
+
 # Large Datasets or Local Scratch
 .agents/
 .claude/
 scratch/
 backend/cache/
 backend/data/
+data/raw/
+data/sequences/

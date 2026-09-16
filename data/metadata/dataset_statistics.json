@@ -1,0 +1,48 @@
+{
+  "dataset_name": "AeroCast-Now AI Historical Convective Dataset",
+  "study_region": {
+    "name": "Tamil Nadu / Chennai",
+    "min_lat": 12.0,
+    "max_lat": 14.5,
+    "min_lon": 79.0,
+    "max_lon": 81.5,
+    "center_lat": 13.25,
+    "center_lon": 80.25,
+    "grid_size": 32,
+    "temporal_resolution_min": 15
+  },
+  "date_range": {
+    "start": "2024-05-01",
+    "end": "2024-10-31"
+  },
+  "spatial_resolution": "32 x 32 grid cells (~4 km per cell, 128 km domain)",
+  "temporal_resolution": "15 minutes UTC",
+  "channels": [
+    "0: Radar Reflectivity (dBZ: [0, 75])",
+    "1: Vertically Integrated Liquid (VIL: [0, 65] kg/m\u00b2)",
+    "2: Satellite TIR Brightness Temperature (\u00b0C: [-85, +35])",
+    "3: Lightning Flash Density (flashes/km\u00b2: [0, 25])"
+  ],
+  "input_shape": [
+    4,
+    32,
+    32,
+    4
+  ],
+  "target_shape": [
+    4,
+    32,
+    32,
+    4
+  ],
+  "number_of_samples": 17654,
+  "train_samples": 12358,
+  "val_samples": 2648,
+  "test_samples": 2648,
+  "missing_data_percentage": 0.0,
+  "storm_sample_count": 183,
+  "non_storm_sample_count": 17471,
+  "lightning_sample_count": 178,
+  "storm_class_ratio": 0.01,
+  "created_at": "2026-09-15T13:59:21.934258+00:00"
+}

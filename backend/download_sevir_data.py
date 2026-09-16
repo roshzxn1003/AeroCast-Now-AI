@@ -24,7 +24,7 @@ import pandas as pd
 import numpy as np
 
 SEVIR_CATALOG_URL = "https://sevir.s3.amazonaws.com/CATALOG.csv"
-SEVIR_S3_BASE = "https://sevir.s3.amazonaws.com"
+SEVIR_S3_BASE = "https://sevir.s3.amazonaws.com/data"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data", "sevir")

@@ -79,7 +79,7 @@ export const FLASH = {
  * Data provenance. The UI must never let measured, derived and modelled values
  * look alike, so every surfaced figure resolves to one of these.
  */
-export type Provenance = 'LIVE' | 'LIVE-DERIVED' | 'MODEL' | 'STALE' | 'UNAVAILABLE';
+export type Provenance = 'LIVE' | 'LIVE_REAL_DATA' | 'HYBRID' | 'SIMULATION' | 'LIVE-DERIVED' | 'MODEL' | 'STALE' | 'UNAVAILABLE';
 
 export const PROVENANCE: Record<
   Provenance,
@@ -89,6 +89,21 @@ export const PROVENANCE: Record<
     color: '#3fae8f',
     label: 'LIVE',
     description: 'Measured by an upstream observation network.',
+  },
+  LIVE_REAL_DATA: {
+    color: '#10b981',
+    label: 'LIVE REAL DATA',
+    description: 'Authentic live IMD/RainViewer radar, INSAT-3D satellite, and Blitzortung LDN.',
+  },
+  HYBRID: {
+    color: '#f59e0b',
+    label: 'HYBRID',
+    description: 'Real-world live observations with continuous convective background alignment.',
+  },
+  SIMULATION: {
+    color: '#a855f7',
+    label: 'SIMULATION',
+    description: 'Procedural synthetic convective scenario for testing and demonstration.',
   },
   'LIVE-DERIVED': {
     color: '#d4a13a',
@@ -108,7 +123,7 @@ export const PROVENANCE: Record<
   UNAVAILABLE: {
     color: '#d9434e',
     label: 'OFFLINE',
-    description: 'Provider unreachable and no cached retrieval available.',
+    description: 'Provider has not responded within the timeout window.',
   },
 };
 

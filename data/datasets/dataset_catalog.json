@@ -1,0 +1,150 @@
+{
+  "catalog_version": "2.0.0",
+  "generated_at": "2026-09-15T18:30:00Z",
+  "study_region": {
+    "primary": "India",
+    "development_domain": "Tamil Nadu / Chennai",
+    "bounding_box": {
+      "min_lat": 12.0,
+      "max_lat": 14.5,
+      "min_lon": 79.0,
+      "max_lon": 81.5
+    },
+    "grid_dimensions": "32x32",
+    "target_cadence": "15 minutes"
+  },
+  "datasets": [
+    {
+      "name": "imd_dwr_composite_network",
+      "source": "India Meteorological Department (IMD)",
+      "variables": [
+        "radar_reflectivity_dbz",
+        "vertically_integrated_liquid_vil",
+        "radial_velocity_ms"
+      ],
+      "spatial_resolution": "1 km to 4 km effective grid over 250 km Doppler range",
+      "temporal_resolution": "10 to 15 minutes",
+      "start_date": "2018-01-01",
+      "end_date": "Present",
+      "status": "available",
+      "coverage": "India DWR Radar Network (Chennai, Mumbai, Delhi, Kolkata, Hyderabad, Kochi, etc.)",
+      "download_method": "Automated HTTPS ingestion via IMD Mausam / IITM DWR node endpoints",
+      "license_or_access": "Government of India National Data Sharing and Accessibility Policy (NDSAP) / Public Meteorological Service"
+    },
+    {
+      "name": "insat_3d_3dr_imager_tir",
+      "source": "MOSDAC (ISRO) / IMD",
+      "variables": [
+        "tir1_brightness_temp_c",
+        "tir2_brightness_temp_c",
+        "water_vapor_bt_c"
+      ],
+      "spatial_resolution": "4 km x 4 km (Thermal IR / Water Vapor), 1 km (Visible)",
+      "temporal_resolution": "15 to 30 minutes",
+      "start_date": "2014-01-01",
+      "end_date": "Present",
+      "status": "available",
+      "coverage": "India & Indian Ocean Region (50°E–110°E, 40°S–45°N)",
+      "download_method": "HTTPS automated retrieval via MOSDAC portal / IMD Mausam satellite cache",
+      "license_or_access": "Open for research, civil protection, and national forecasting under ISRO/MOSDAC open data policy"
+    },
+    {
+      "name": "era5_hourly_reanalysis_india",
+      "source": "ECMWF / Copernicus Climate Change Service (via Open-Meteo Archive)",
+      "variables": [
+        "temperature_2m_c",
+        "relative_humidity_pct",
+        "surface_pressure_hpa",
+        "wind_speed_10m_ms",
+        "wind_direction_deg",
+        "precipitation_mm",
+        "convective_available_potential_energy_cape",
+        "lifted_index_c",
+        "total_totals_index",
+        "k_index",
+        "wind_shear_0_6km_kts",
+        "precipitable_water_mm"
+      ],
+      "spatial_resolution": "0.1° (~11 km) / 0.25° (~28 km)",
+      "temporal_resolution": "1 hour (interpolated to 15-minute standard cadence)",
+      "start_date": "1940-01-01",
+      "end_date": "Present",
+      "status": "available",
+      "coverage": "Global historical coverage; queried for Tamil Nadu / Chennai domain (12.0°N–14.5°N, 79.0°E–81.5°E)",
+      "download_method": "HTTPS REST API via Open-Meteo Historical Archive (ECMWF ERA5 / Copernicus single levels)",
+      "license_or_access": "Copernicus Open Access / Creative Commons Attribution (CC-BY-4.0)"
+    },
+    {
+      "name": "blitzortung_ldn_lightning_archive",
+      "source": "Blitzortung Community Lightning Detection Network",
+      "variables": [
+        "lightning_count",
+        "lightning_density_flashes_km2",
+        "strike_coordinates_lat_lon",
+        "strike_timestamps_utc"
+      ],
+      "spatial_resolution": "1 km to 5 km stroke location accuracy (Time-of-Arrival triangulation)",
+      "temporal_resolution": "Continuous real-time / binned to 15-minute intervals",
+      "start_date": "2015-01-01",
+      "end_date": "Present",
+      "status": "available",
+      "coverage": "Global network including South Asia / Indian Subcontinent",
+      "download_method": "TCP / WebSocket live stream and binned stroke archive logs",
+      "license_or_access": "Community non-commercial open data / contributors agreement"
+    },
+    {
+      "name": "sevir_convective_benchmark",
+      "source": "NOAA / Stanford / AWS Open Data",
+      "variables": [
+        "vertically_integrated_liquid_vil",
+        "radar_reflectivity_dbz",
+        "ir107_satellite_bt_c",
+        "lght_flash_density_flashes_km2"
+      ],
+      "spatial_resolution": "1 km x 1 km (Radar VIL / Satellite IR), 2 km x 2 km (Lightning GLM)",
+      "temporal_resolution": "5 minutes (aggregated to 15-minute intervals)",
+      "start_date": "2017-01-01",
+      "end_date": "2019-12-31",
+      "status": "available",
+      "coverage": "Continental multi-sensor severe convective storm events (co-registered NEXRAD, GOES-16, GLM)",
+      "download_method": "HTTPS / AWS S3 Open Data (s3://sevir/)",
+      "license_or_access": "Creative Commons Zero (CC0) / Public Domain"
+    },
+    {
+      "name": "gpm_imerg_precipitation",
+      "source": "NASA Earth Science Data Systems",
+      "variables": [
+        "precipitation_rate_mm_h",
+        "calibrated_precipitation_accumulation"
+      ],
+      "spatial_resolution": "0.1° x 0.1° (~10 km)",
+      "temporal_resolution": "30 minutes",
+      "start_date": "2000-06-01",
+      "end_date": "Present",
+      "status": "available",
+      "coverage": "Global (60°N to 60°S)",
+      "download_method": "NASA Earthdata HTTPS / OPeNDAP",
+      "license_or_access": "NASA Earth Science Open Data Policy (Free and open)"
+    },
+    {
+      "name": "imd_aws_surface_network",
+      "source": "India Meteorological Department (IMD)",
+      "variables": [
+        "temperature_c",
+        "relative_humidity_pct",
+        "surface_pressure_hpa",
+        "wind_speed_ms",
+        "wind_direction_deg",
+        "rainfall_mm_h"
+      ],
+      "spatial_resolution": "Point automated weather stations across India",
+      "temporal_resolution": "15 minutes to hourly",
+      "start_date": "2012-01-01",
+      "end_date": "Present",
+      "status": "pipeline_ready",
+      "coverage": "India-wide (~1000+ Automated Weather Stations)",
+      "download_method": "HTTPS REST API via api.imd.gov.in (requires institutional API key for historical batch)",
+      "license_or_access": "Government of India NDSAP policy; pipeline interface implemented with graceful fallback"
+    }
+  ]
+}

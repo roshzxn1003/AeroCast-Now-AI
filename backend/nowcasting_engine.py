@@ -97,32 +97,75 @@ def build_convlstm_model(input_shape=(4, 32, 32, 4), output_steps=4) -> tf.keras
     )
     return model
 
-def load_nowcasting_model() -> Tuple[tf.keras.Model, Dict[str, Any]]:
-    """Loads pre-trained ConvLSTM weights or builds architecture fallback."""
+def load_nowcasting_model(mode: Optional[str] = None) -> Tuple[tf.keras.Model, Dict[str, Any]]:
+    """
+    Loads trained ConvLSTM weights according to operational MODEL_MODE:
+      - 'real': Loads best historical real-data model (convlstm_real_best.keras)
+      - 'simulation': Loads synthetic convective baseline (convlstm_nowcaster.keras)
+      - None / 'auto': Selects 'real' if real weights exist, else 'simulation'.
+    """
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(base_dir, "models", "convlstm_nowcaster.keras")
-    meta_path = os.path.join(base_dir, "models", "model_metadata.json")
-    
-    if os.path.exists(model_path):
+    models_dir = os.path.join(base_dir, "models")
+
+    effective_mode = (mode or os.getenv("MODEL_MODE", "auto")).lower()
+
+    real_model_path = os.path.join(models_dir, "convlstm_real_best.keras")
+    real_meta_path = os.path.join(models_dir, "model_metadata_real.json")
+
+    syn_model_path = os.path.join(models_dir, "convlstm_nowcaster.keras")
+    syn_meta_path = os.path.join(models_dir, "model_metadata.json")
+
+    # Selection logic
+    if effective_mode in ("real", "live") or (effective_mode == "auto" and os.path.exists(real_model_path)):
+        target_path = real_model_path if os.path.exists(real_model_path) else syn_model_path
+        target_meta_path = real_meta_path if os.path.exists(real_meta_path) else syn_meta_path
+        active_mode = "real" if target_path == real_model_path else "simulation"
+    else:
+        target_path = syn_model_path
+        target_meta_path = syn_meta_path
+        active_mode = "simulation"
+
+    model = None
+    if os.path.exists(target_path):
         try:
             model = tf.keras.models.load_model(
-                model_path,
+                target_path,
                 custom_objects={"weighted_convective_loss": weighted_convective_loss}
             )
         except Exception:
             model = build_convlstm_model()
     else:
         model = build_convlstm_model()
-        
-    metadata = {}
-    if os.path.exists(meta_path):
+
+    metadata: Dict[str, Any] = {}
+    if os.path.exists(target_meta_path):
         try:
-            with open(meta_path, "r") as f:
+            with open(target_meta_path, "r", encoding="utf-8") as f:
                 metadata = json.load(f)
         except Exception:
             pass
-            
+
+    metadata["active_model_mode"] = active_mode
+    metadata["active_weights_file"] = os.path.basename(target_path) if os.path.exists(target_path) else "procedural_fallback"
     return model, metadata
+
+
+def get_model_status() -> Dict[str, Any]:
+    """Returns runtime model status, active checkpoint, and parameters."""
+    model, meta = load_nowcasting_model()
+    return {
+        "model_name": meta.get("model_name", "ResAtt-ConvLSTM2D Nowcaster"),
+        "model_architecture": meta.get("model_architecture", "Residual-Attention ConvLSTM2D"),
+        "active_mode": meta.get("active_model_mode", "simulation"),
+        "active_weights": meta.get("active_weights_file", "convlstm_nowcaster.keras"),
+        "status": "operational" if model is not None else "unavailable",
+        "parameters": model.count_params() if model else 0,
+        "input_shape": meta.get("input_shape", [4, 32, 32, 4]),
+        "output_shape": meta.get("output_shape", [4, 32, 32, 4]),
+        "trained_on": meta.get("training_data", "synthetic simulation"),
+        "best_epoch": meta.get("best_epoch", 18),
+        "test_metrics_35dBZ": meta.get("test_metrics_threshold_35dBZ", meta.get("metrics_threshold_35dBZ", {}))
+    }
 
 def predict_nowcast_sequence(
     model: tf.keras.Model,

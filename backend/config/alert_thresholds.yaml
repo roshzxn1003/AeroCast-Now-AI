@@ -1,0 +1,117 @@
+# ==============================================================================
+# AeroCast-Now AI — Alert Thresholds & Risk Scoring Configuration
+# ==============================================================================
+# Calibrated against IMD Doppler Weather Radar operational guidelines,
+# Schultz et al. 2-Sigma Lightning Jump algorithm, and Phase 4 empirical evaluations.
+#
+# IMPORTANT: These thresholds drive internal AI decision-support algorithms.
+# They are NOT official IMD warnings.
+# ==============================================================================
+
+# Standardized AI Risk Level Score Bands [0.0 - 100.0]
+risk_scale:
+  normal:
+    min_score: 0.0
+    max_score: 20.0
+    color: "#10b981"
+    label: "NORMAL"
+    description: "Background atmospheric convective activity. No significant hazard."
+  low:
+    min_score: 20.0
+    max_score: 40.0
+    color: "#38bdf8"
+    label: "LOW"
+    description: "Developing isolated showers or weak convective clouds."
+  moderate:
+    min_score: 40.0
+    max_score: 65.0
+    color: "#f59e0b"
+    label: "MODERATE"
+    description: "Active thunderstorm with lightning strikes, gusty winds, and moderate downpours."
+  high:
+    min_score: 65.0
+    max_score: 85.0
+    color: "#f97316"
+    label: "HIGH"
+    description: "Severe thunderstorm with intense lightning, potential microbursts, and localized hail."
+  severe:
+    min_score: 85.0
+    max_score: 100.0
+    color: "#ef4444"
+    label: "SEVERE"
+    description: "Extreme multicell or supercell cluster. High probability of damaging winds, heavy hail, and flooding."
+
+# Explainable Risk Scoring Component Weights (Sum = 1.0)
+scoring_weights:
+  radar_intensity: 0.28       # Max & mean convective core reflectivity (dBZ)
+  lightning_surge: 0.25       # Total flash rate & 2-sigma jump precursor metric
+  forecast_growth: 0.20       # ConvLSTM lead-time intensification trend (T0 -> +15m -> +30m)
+  instability: 0.15           # Atmospheric sounding thermodynamics (CAPE, Shear, Lifted Index)
+  persistence_vil: 0.12       # Vertically Integrated Liquid (VIL) & multi-step cell persistence
+
+# Meteorological Physical Thresholds
+thresholds:
+  reflectivity_dbz:
+    marginal: 28.0
+    moderate: 36.0
+    high: 46.0
+    severe: 52.0
+
+  vil_kg_m2:
+    marginal: 8.0
+    moderate: 15.0
+    high: 25.0
+    severe: 35.0
+
+  lightning_flash_rate_fpm:
+    elevated: 8.0
+    high: 16.0
+    severe: 28.0
+
+  lightning_jump:
+    min_sigma: 1.8
+    critical_sigma: 2.2
+    min_rate_fpm: 12.0
+    min_surge_dfr_dt: 8.0
+
+  forecast_intensification:
+    rapid_growth_delta_dbz: 5.0
+    explosive_growth_delta_dbz: 9.0
+    rapid_growth_delta_vil: 8.0
+
+  instability:
+    cape_moderate_j_kg: 1400.0
+    cape_high_j_kg: 2400.0
+    cape_extreme_j_kg: 3400.0
+    deep_layer_shear_kts_high: 28.0
+    lifted_index_c_unstable: -3.0
+
+  proximity_radii_km:
+    critical_airport: 25.0
+    urban_metropolitan: 30.0
+    district_advisory: 50.0
+
+# Strategic Asset Registry for Proximity Threat Analysis
+key_assets:
+  airports:
+    - id: "VOMM"
+      name: "Chennai International Airport"
+      lat: 12.9941
+      lon: 80.1709
+      critical_radius_km: 25.0
+    - id: "VOAI"
+      name: "Tambaram Air Force Base"
+      lat: 12.9077
+      lon: 80.1219
+      critical_radius_km: 20.0
+  critical_facilities:
+    - id: "SHAR"
+      name: "Satish Dhawan Space Centre (Sriharikota)"
+      lat: 13.7199
+      lon: 80.2300
+      critical_radius_km: 35.0
+    - id: "CHENNAI_PORT"
+      name: "Chennai Port Trust & Harbour"
+      lat: 13.0878
+      lon: 80.2985
+      critical_radius_km: 18.0

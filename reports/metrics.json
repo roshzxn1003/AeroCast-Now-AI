@@ -1,0 +1,184 @@
+{
+  "model_name": "AeroCast ResAtt-ConvLSTM2D Real-Data Nowcaster",
+  "model_architecture": "Residual-Attention ConvLSTM2D (ResAtt-ConvLSTM2D)",
+  "training_data": "real historical (ECMWF ERA5 / IMD / Blitzortung)",
+  "training_date": "2026-09-15T14:28:35.957871+00:00",
+  "device_used": "CPU",
+  "dataset_version": "2.0.0 (Phase 2)",
+  "input_shape": [
+    4,
+    32,
+    32,
+    4
+  ],
+  "output_shape": [
+    4,
+    32,
+    32,
+    4
+  ],
+  "channels": [
+    "Radar Reflectivity (dBZ: [0, 75])",
+    "Vertically Integrated Liquid (kg/m\u00b2: [0, 65])",
+    "INSAT-3D TIR Brightness Temp (\u00b0C: [-85, +35])",
+    "Lightning Flash Density (flashes/km\u00b2: [0, 25])"
+  ],
+  "forecast_lead_times_minutes": [
+    15,
+    30,
+    45,
+    60
+  ],
+  "epochs_trained": 10,
+  "best_epoch": 10,
+  "best_val_loss": 0.01782,
+  "training_duration_seconds": 625.2,
+  "samples": {
+    "training_samples_seen": 464,
+    "validation_samples": 2648,
+    "test_samples_unseen": 2648
+  },
+  "test_metrics_threshold_25dBZ": {
+    "hits": 0,
+    "misses": 48688,
+    "false_alarms": 0,
+    "correct_negatives": 10797520,
+    "CSI_Threat_Score": 0.0,
+    "Probability_of_Detection_POD": 0.0,
+    "False_Alarm_Ratio_FAR": 0.0,
+    "Heidke_Skill_Score_HSS": 0.0
+  },
+  "test_metrics_threshold_35dBZ": {
+    "hits": 0,
+    "misses": 1856,
+    "false_alarms": 0,
+    "correct_negatives": 10844352,
+    "CSI_Threat_Score": 0.0,
+    "Probability_of_Detection_POD": 0.0,
+    "False_Alarm_Ratio_FAR": 0.0,
+    "Heidke_Skill_Score_HSS": 0.0
+  },
+  "test_metrics_threshold_45dBZ": {
+    "hits": 0,
+    "misses": 0,
+    "false_alarms": 0,
+    "correct_negatives": 10846208,
+    "CSI_Threat_Score": 0.0,
+    "Probability_of_Detection_POD": 0.0,
+    "False_Alarm_Ratio_FAR": 0.0,
+    "Heidke_Skill_Score_HSS": 0.5001
+  },
+  "channel_errors": {
+    "radar_dbz": {
+      "MAE": 0.467,
+      "RMSE": 3.206,
+      "observed_mean": 0.466,
+      "predicted_mean": 0.001
+    },
+    "vil_kg_m2": {
+      "MAE": 0.036,
+      "RMSE": 0.389,
+      "observed_mean": 0.035,
+      "predicted_mean": 0.001
+    },
+    "satellite_tir_c": {
+      "MAE": 8.199,
+      "RMSE": 9.456,
+      "observed_mean": 26.795,
+      "predicted_mean": 34.993
+    },
+    "lightning_flash_density": {
+      "MAE": 0.0,
+      "RMSE": 0.008,
+      "observed_mean": 0.0,
+      "predicted_mean": 0.0
+    }
+  },
+  "lead_time_metrics": {
+    "+15m": {
+      "lead_time_minutes": 15,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.001,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    },
+    "+30m": {
+      "lead_time_minutes": 30,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.0,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    },
+    "+45m": {
+      "lead_time_minutes": 45,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.0,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    },
+    "+60m": {
+      "lead_time_minutes": 60,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.0,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    }
+  },
+  "storm_cell_metrics": {
+    "total_true_cells": 22,
+    "matched_detected_cells": 0,
+    "cell_detection_rate": 0.0,
+    "mean_centroid_displacement_km": 0.0,
+    "mean_core_reflectivity_error_dbz": 37.71
+  },
+  "thunderstorm_confusion_matrix": {
+    "true_positives": 40,
+    "false_positives": 2608,
+    "true_negatives": 0,
+    "false_negatives": 0,
+    "total_samples": 2648,
+    "accuracy": 0.0151,
+    "precision": 0.0151,
+    "recall": 1.0,
+    "f1_score": 0.0298
+  },
+  "best_checkpoint": "convlstm_real_best.keras",
+  "latest_checkpoint": "convlstm_real_latest.keras",
+  "provenance": "REAL_HISTORICAL_DATASET"
+}

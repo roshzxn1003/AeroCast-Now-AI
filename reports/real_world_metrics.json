@@ -1,0 +1,338 @@
+{
+  "dataset": {
+    "type": "real_historical",
+    "region": "Tamil Nadu / Chennai Domain (12.0\u00b0N\u201314.5\u00b0N, 79.0\u00b0E\u201381.5\u00b0E)",
+    "date_range": "2024-10-03 to 2024-10-31 UTC (Chronologically held out)",
+    "test_samples": 2648,
+    "storm_events_count": 40,
+    "data_sources": [
+      "ECMWF ERA5 Reanalysis",
+      "IMD Doppler Weather Radar Cache",
+      "Blitzortung Lightning Detection Network"
+    ]
+  },
+  "model": {
+    "name": "AeroCast ResAtt-ConvLSTM2D Nowcaster",
+    "architecture": "Residual-Attention ConvLSTM2D",
+    "weights_file": "convlstm_real_best.keras",
+    "parameters": 191524,
+    "input_shape": [
+      4,
+      32,
+      32,
+      4
+    ],
+    "output_shape": [
+      4,
+      32,
+      32,
+      4
+    ]
+  },
+  "lead_times": {
+    "15": {
+      "AI_Model": {
+        "lead_time_minutes": 15,
+        "CSI": 0.0,
+        "POD": 0.0,
+        "FAR": 0.0,
+        "HSS": 0.0,
+        "reflectivity_mae_dbz": 0.47,
+        "reflectivity_rmse_dbz": 3.21,
+        "flash_mae": 0.001,
+        "contingency": {
+          "hits": 0,
+          "misses": 464,
+          "false_alarms": 0,
+          "correct_negatives": 2711088
+        }
+      },
+      "Persistence_Baseline": {
+        "lead_time_minutes": 15,
+        "CSI": 0.6338,
+        "POD": 0.7759,
+        "FAR": 0.2241,
+        "HSS": 0.7758,
+        "reflectivity_mae_dbz": 0.09,
+        "reflectivity_rmse_dbz": 1.08,
+        "reflectivity_bias_dbz": 0.0,
+        "hits": 360,
+        "misses": 104,
+        "false_alarms": 104,
+        "correct_negatives": 2710984
+      },
+      "Confusion_Matrix": {
+        "true_positives": 0,
+        "false_positives": 0,
+        "true_negatives": 2413,
+        "false_negatives": 235,
+        "total_samples": 2648,
+        "accuracy": 0.9113,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "lead_time_minutes": 15
+      }
+    },
+    "30": {
+      "AI_Model": {
+        "lead_time_minutes": 30,
+        "CSI": 0.0,
+        "POD": 0.0,
+        "FAR": 0.0,
+        "HSS": 0.0,
+        "reflectivity_mae_dbz": 0.47,
+        "reflectivity_rmse_dbz": 3.21,
+        "flash_mae": 0.0,
+        "contingency": {
+          "hits": 0,
+          "misses": 464,
+          "false_alarms": 0,
+          "correct_negatives": 2711088
+        }
+      },
+      "Persistence_Baseline": {
+        "lead_time_minutes": 30,
+        "CSI": 0.45,
+        "POD": 0.6207,
+        "FAR": 0.3793,
+        "HSS": 0.6206,
+        "reflectivity_mae_dbz": 0.17,
+        "reflectivity_rmse_dbz": 1.57,
+        "reflectivity_bias_dbz": 0.0,
+        "hits": 288,
+        "misses": 176,
+        "false_alarms": 176,
+        "correct_negatives": 2710912
+      },
+      "Confusion_Matrix": {
+        "true_positives": 0,
+        "false_positives": 0,
+        "true_negatives": 2413,
+        "false_negatives": 235,
+        "total_samples": 2648,
+        "accuracy": 0.9113,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "lead_time_minutes": 30
+      }
+    },
+    "45": {
+      "AI_Model": {
+        "lead_time_minutes": 45,
+        "CSI": 0.0,
+        "POD": 0.0,
+        "FAR": 0.0,
+        "HSS": 0.0,
+        "reflectivity_mae_dbz": 0.47,
+        "reflectivity_rmse_dbz": 3.21,
+        "flash_mae": 0.0,
+        "contingency": {
+          "hits": 0,
+          "misses": 464,
+          "false_alarms": 0,
+          "correct_negatives": 2711088
+        }
+      },
+      "Persistence_Baseline": {
+        "lead_time_minutes": 45,
+        "CSI": 0.3182,
+        "POD": 0.4828,
+        "FAR": 0.5172,
+        "HSS": 0.4827,
+        "reflectivity_mae_dbz": 0.24,
+        "reflectivity_rmse_dbz": 1.96,
+        "reflectivity_bias_dbz": 0.0,
+        "hits": 224,
+        "misses": 240,
+        "false_alarms": 240,
+        "correct_negatives": 2710848
+      },
+      "Confusion_Matrix": {
+        "true_positives": 0,
+        "false_positives": 0,
+        "true_negatives": 2413,
+        "false_negatives": 235,
+        "total_samples": 2648,
+        "accuracy": 0.9113,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "lead_time_minutes": 45
+      }
+    },
+    "60": {
+      "AI_Model": {
+        "lead_time_minutes": 60,
+        "CSI": 0.0,
+        "POD": 0.0,
+        "FAR": 0.0,
+        "HSS": 0.0,
+        "reflectivity_mae_dbz": 0.47,
+        "reflectivity_rmse_dbz": 3.21,
+        "flash_mae": 0.0,
+        "contingency": {
+          "hits": 0,
+          "misses": 464,
+          "false_alarms": 0,
+          "correct_negatives": 2711088
+        }
+      },
+      "Persistence_Baseline": {
+        "lead_time_minutes": 60,
+        "CSI": 0.2211,
+        "POD": 0.3621,
+        "FAR": 0.6379,
+        "HSS": 0.362,
+        "reflectivity_mae_dbz": 0.3,
+        "reflectivity_rmse_dbz": 2.26,
+        "reflectivity_bias_dbz": 0.0,
+        "hits": 168,
+        "misses": 296,
+        "false_alarms": 296,
+        "correct_negatives": 2710792
+      },
+      "Confusion_Matrix": {
+        "true_positives": 0,
+        "false_positives": 0,
+        "true_negatives": 2413,
+        "false_negatives": 235,
+        "total_samples": 2648,
+        "accuracy": 0.9113,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "lead_time_minutes": 60
+      }
+    }
+  },
+  "channel_regression_metrics": {
+    "radar_dbz": {
+      "MAE": 0.467,
+      "RMSE": 3.206,
+      "observed_mean": 0.466,
+      "predicted_mean": 0.001
+    },
+    "vil_kg_m2": {
+      "MAE": 0.036,
+      "RMSE": 0.389,
+      "observed_mean": 0.035,
+      "predicted_mean": 0.001
+    },
+    "satellite_tir_c": {
+      "MAE": 8.199,
+      "RMSE": 9.456,
+      "observed_mean": 26.795,
+      "predicted_mean": 34.993
+    },
+    "lightning_flash_density": {
+      "MAE": 0.0,
+      "RMSE": 0.008,
+      "observed_mean": 0.0,
+      "predicted_mean": 0.0
+    }
+  },
+  "location_error": {
+    "mean_km": 187.65,
+    "median_km": 187.65,
+    "max_km": 187.65,
+    "std_km": 0.0,
+    "by_lead_time": {
+      "+15m": {
+        "mean_km": 187.65,
+        "median_km": 187.65,
+        "count": 38
+      },
+      "+30m": {
+        "mean_km": 187.65,
+        "median_km": 187.65,
+        "count": 40
+      },
+      "+45m": {
+        "mean_km": 187.65,
+        "median_km": 187.65,
+        "count": 40
+      },
+      "+60m": {
+        "mean_km": 187.65,
+        "median_km": 187.65,
+        "count": 39
+      }
+    }
+  },
+  "lightning_jump_evaluation": {
+    "total_test_storm_events": 40,
+    "detected_jumps": 5,
+    "correct_detections": 3,
+    "false_detections": 2,
+    "missed_events": 15,
+    "jump_precision": 0.6,
+    "jump_recall": 0.167
+  },
+  "probability_calibration": {
+    "brier_score": 0.01527,
+    "brier_skill_score": -0.0263,
+    "climatological_base_rate": 0.0151,
+    "calibration_bins": [
+      {
+        "bin_range": "0.0-0.2",
+        "sample_count": 2648,
+        "mean_predicted_prob": 0.023,
+        "observed_frequency": 0.015
+      },
+      {
+        "bin_range": "0.2-0.4",
+        "sample_count": 0,
+        "mean_predicted_prob": 0.3,
+        "observed_frequency": 0.0
+      },
+      {
+        "bin_range": "0.4-0.6",
+        "sample_count": 0,
+        "mean_predicted_prob": 0.5,
+        "observed_frequency": 0.0
+      },
+      {
+        "bin_range": "0.6-0.8",
+        "sample_count": 0,
+        "mean_predicted_prob": 0.7,
+        "observed_frequency": 0.0
+      },
+      {
+        "bin_range": "0.8-1.0",
+        "sample_count": 0,
+        "mean_predicted_prob": 0.9,
+        "observed_frequency": 0.0
+      }
+    ]
+  },
+  "synthetic_baseline_comparison": {
+    "model_evaluated": "convlstm_nowcaster.keras (Trained on synthetic procedural simulation)",
+    "test_dataset": "Unseen authentic historical dataset (Same 2,648 test samples)",
+    "radar_dbz_mae": 2.68,
+    "radar_dbz_rmse": 5.52,
+    "max_predicted_dbz": 74.32,
+    "finding": "Synthetic model hallucinates high-reflectivity convective storms in quiet real-world weather, generating frequent false alarms (MAE: 2.26 dBZ vs Real Model MAE: 0.47 dBZ)."
+  },
+  "failure_analysis": [
+    {
+      "case_type": "Rapid Convective Initiation (Missed Storm)",
+      "sample_index": 902,
+      "t0_radar_dbz": 0.0,
+      "actual_future_dbz": 36.7,
+      "predicted_future_dbz": 0.8,
+      "error_description": "Convective storm rapidly exploded from calm air in 30 minutes. The pure kinematic ConvLSTM cannot predict thermodynamic initiation without atmospheric sounding integration."
+    },
+    {
+      "case_type": "Peak Core Intensity Underestimation (Blurring)",
+      "sample_index": 906,
+      "t0_radar_dbz": 36.7,
+      "actual_future_dbz": 38.6,
+      "predicted_future_dbz": 0.8,
+      "error_description": "Persistent severe core was heavily smoothed by L1 loss optimization to the conditional mean, diffusing a 38+ dBZ core down to sub-threshold background."
+    }
+  ],
+  "evaluation_duration_seconds": 63.8,
+  "evaluation_timestamp": "2026-09-15T15:11:35.721594+00:00"
+}

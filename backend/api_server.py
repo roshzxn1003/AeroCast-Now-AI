@@ -13,7 +13,7 @@ import json
 import time
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 # Ensure backend directory is in sys.path
@@ -44,6 +44,7 @@ from live_data_service import (
 )
 from nowcasting_engine import (
     load_nowcasting_model,
+    get_model_status,
     predict_nowcast_sequence,
     identify_and_track_storm_cells,
     detect_lightning_jump,
@@ -78,6 +79,17 @@ _weather_provider = CompositeWeatherProvider()
 _radar_provider = CompositeRadarProvider()
 _satellite_provider = INSATSatelliteProvider()
 _lightning_provider = BlitzortungLightningProvider()
+
+# Phase 5: Live Pipeline & ML Inference Singletons
+from live import LiveNowcastPipeline
+from ml import LiveInferenceService, ModelLoader
+from ml.prediction_postprocessor import grid_to_heatmap
+
+_live_pipeline = LiveNowcastPipeline()
+_live_inference_service = LiveInferenceService()
+
+# Phase 7: AI Alerts, Impact Prediction & Decision Support
+from alerts import alert_engine, RiskLevel, AlertCategory
 
 # ==============================================================================
 # APP INITIALIZATION
@@ -141,40 +153,62 @@ async def health_check():
     }
 
 
+@app.get("/api/model/status")
+async def model_status():
+    """Return runtime model status, active model mode, checkpoint path, and parameter count."""
+    return get_model_status()
+
+
 @app.get("/api/model-info")
 async def model_info():
     """Return model architecture metadata and evaluation metrics."""
     model, meta = _get_model()
 
-    # Read metadata from file for ground truth
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    meta_path = os.path.join(base_dir, "models", "model_metadata.json")
+    active_mode = meta.get("active_model_mode", os.getenv("MODEL_MODE", "real").lower()) if meta else os.getenv("MODEL_MODE", "real").lower()
+    meta_file = "model_metadata_real.json" if (active_mode == "real" and os.path.exists(os.path.join(base_dir, "models", "model_metadata_real.json"))) else "model_metadata.json"
+    meta_path = os.path.join(base_dir, "models", meta_file)
+
     if os.path.exists(meta_path):
-        with open(meta_path, "r") as f:
+        with open(meta_path, "r", encoding="utf-8") as f:
             file_meta = json.load(f)
     else:
         file_meta = meta or {}
 
+    ch_errs = file_meta.get("channel_errors", {})
     return {
-        "architecture": file_meta.get("model_architecture", "ConvLSTM2D"),
+        "architecture": file_meta.get("model_architecture", "Residual-Attention ConvLSTM2D"),
+        "model_name": file_meta.get("model_name", "ResAtt-ConvLSTM2D Nowcaster"),
+        "active_mode": active_mode,
+        "active_weights": file_meta.get("active_weights_file", os.path.basename(file_meta.get("best_checkpoint", "convlstm_real_best.keras" if active_mode == "real" else "convlstm_nowcaster.keras"))),
         "input_shape": file_meta.get("input_shape", [4, 32, 32, 4]),
         "output_shape": file_meta.get("output_shape", [4, 32, 32, 4]),
         "channels": file_meta.get("channels", []),
-        "forecast_lead_times_minutes": file_meta.get("forecast_lead_times_minutes", [15, 30, 45, 60, 90, 120]),
+        "forecast_lead_times_minutes": file_meta.get("forecast_lead_times_minutes", [15, 30, 45, 60]),
         "total_parameters": model.count_params() if model else 0,
+        "trained_on": file_meta.get("training_data", "real historical"),
         "metrics": {
-            "reflectivity_mae_dbz": file_meta.get("reflectivity_mae_dbz", None),
-            "reflectivity_rmse_dbz": file_meta.get("reflectivity_rmse_dbz", None),
-            "training_epochs": file_meta.get("training_epochs", None),
-            "training_samples": file_meta.get("training_samples", None),
-            "validation_samples": file_meta.get("validation_samples", None),
+            "reflectivity_mae_dbz": ch_errs.get("radar_dbz", {}).get("MAE", file_meta.get("reflectivity_mae_dbz", None)),
+            "reflectivity_rmse_dbz": ch_errs.get("radar_dbz", {}).get("RMSE", file_meta.get("reflectivity_rmse_dbz", None)),
+            "vil_mae_kg_m2": ch_errs.get("vil_kg_m2", {}).get("MAE", None),
+            "satellite_tir_mae_c": ch_errs.get("satellite_tir_c", {}).get("MAE", None),
+            "lightning_flash_mae": ch_errs.get("lightning_flash_density", {}).get("MAE", None),
+            "training_epochs": file_meta.get("epochs_trained", file_meta.get("training_epochs", None)),
+            "best_epoch": file_meta.get("best_epoch", None),
+            "best_val_loss": file_meta.get("best_val_loss", None),
+            "training_samples": file_meta.get("samples", {}).get("training_samples_seen", file_meta.get("training_samples", None)),
+            "validation_samples": file_meta.get("samples", {}).get("validation_samples", file_meta.get("validation_samples", None)),
+            "test_samples": file_meta.get("samples", {}).get("test_samples_unseen", None),
         },
         "threshold_metrics": {
-            "25dBZ": file_meta.get("metrics_threshold_25dBZ", {}),
-            "35dBZ": file_meta.get("metrics_threshold_35dBZ", {}),
-            "45dBZ": file_meta.get("metrics_threshold_45dBZ", {}),
+            "25dBZ": file_meta.get("test_metrics_threshold_25dBZ", file_meta.get("metrics_threshold_25dBZ", {})),
+            "35dBZ": file_meta.get("test_metrics_threshold_35dBZ", file_meta.get("metrics_threshold_35dBZ", {})),
+            "45dBZ": file_meta.get("test_metrics_threshold_45dBZ", file_meta.get("metrics_threshold_45dBZ", {})),
         },
-        "data_note": "Metrics from actual model training — not simulated.",
+        "lead_time_metrics": file_meta.get("lead_time_metrics", {}),
+        "storm_cell_metrics": file_meta.get("storm_cell_metrics", {}),
+        "confusion_matrix": file_meta.get("thunderstorm_confusion_matrix", {}),
+        "data_note": "Metrics from actual model training and held-out test evaluation.",
     }
 
 
@@ -317,7 +351,7 @@ async def run_nowcast(
     else:
         data_note = "SIMULATED DATA — Synthetic convective fields for demonstration"
 
-    return {
+    payload = {
         "data_note": data_note,
         "provenance": provenance,
         "data_mode": obs_metadata.get("data_mode", data_mode),
@@ -343,6 +377,13 @@ async def run_nowcast(
         "lightning_jump": jump_result,
         "cap_bulletin": cap,
     }
+
+    # Phase 7: Evaluate AI Convective Risk & Alerts
+    assessment, active_alerts = alert_engine.evaluate_nowcast(payload)
+    payload["risk_assessment"] = assessment.to_dict()
+    payload["active_alerts"] = [a.to_dict() for a in active_alerts]
+
+    return payload
 
 
 # ==============================================================================
@@ -559,6 +600,144 @@ async def live_network_status():
                 "active_feed": "https://api.rainviewer.com/public/weather-maps.json",
             },
         ],
+    }
+
+
+# ==============================================================================
+# LIVE REAL-TIME AI NOWCASTING (PHASE 5)
+# ==============================================================================
+
+@app.get("/api/live/nowcast")
+async def run_live_nowcast(
+    station: str = Query(default="Chennai DWR (Sriharikota/Port)", description="DWR station name"),
+    storm_mode: str = Query(default="Severe Squall Line", description="Storm scenario / mode"),
+    forecast_steps: int = Query(default=4, ge=1, le=6, description="Forecast steps (1-6, each 15 min)"),
+    data_mode: str = Query(default="hybrid", description="Data mode: 'real' (authentic live only), 'hybrid' (live with continuous alignment), or 'simulation'"),
+):
+    """
+    Phase 5 Live Nowcasting Endpoint:
+    Real multi-modal data -> Rolling observation buffer -> ConvLSTM inference -> SCIT storm tracking -> 3D globe products.
+    """
+    if station not in RADAR_STATIONS:
+        raise HTTPException(status_code=404, detail=f"Station '{station}' not found. Available: {list(RADAR_STATIONS.keys())}")
+
+    st_info = RADAR_STATIONS[station]
+    lat, lon = st_info["lat"], st_info["lon"]
+
+    # 1. Pull / synchronize multi-modal sequence from live pipeline
+    seq_res = await _live_pipeline.get_sequence_for_inference(
+        lat=lat,
+        lon=lon,
+        station_name=station,
+        storm_mode=storm_mode,
+        data_mode=data_mode,
+    )
+
+    # 2. In real mode, if fewer than 4 frames are buffered, report honest status without fabrication
+    if not seq_res["sequence_ready"]:
+        curr_frame = seq_res.get("current_frame")
+        obs_payload = {}
+        if curr_frame is not None:
+            dbz = curr_frame[..., 0]
+            vil = curr_frame[..., 1]
+            cells = identify_and_track_storm_cells(dbz, vil)
+            obs_payload = {
+                "max_dbz": float(np.max(dbz)),
+                "max_vil": float(np.max(vil)),
+                "min_tir_c": float(np.min(curr_frame[..., 2])),
+                "flash_rate_fpm": float(np.sum(curr_frame[..., 3]) * 0.4),
+                "storm_cells": cells,
+                "dbz_grid": grid_to_heatmap(dbz, downsample=2),
+                "history_grids": [],
+            }
+        cap_doc = generate_cap_bulletin(
+            station_name=station,
+            storm_cells=cells if curr_frame is not None else [],
+            jump_info={"has_jump": False, "jump_detected": False, "confidence": 0.0},
+            sounding=seq_res.get("sounding", {}),
+        )
+        return {
+            "mode": seq_res["mode"],
+            "provenance": seq_res["provenance"],
+            "data_note": seq_res["data_note"],
+            "sequence_ready": False,
+            "station": station,
+            "location": {"lat": lat, "lon": lon},
+            "state": st_info.get("state", "Tamil Nadu"),
+            "observation_timestamp": seq_res["timestamps"][-1].isoformat() if seq_res["timestamps"] else datetime.now(timezone.utc).isoformat(),
+            "prediction_timestamp": datetime.now(timezone.utc).isoformat(),
+            "inference_time_ms": 0.0,
+            "freshness": seq_res["freshness"].to_dict() if hasattr(seq_res["freshness"], "to_dict") else {},
+            "observation": obs_payload,
+            "forecast": [],
+            "forecast_grids": [],
+            "lightning_jump": {"has_jump": False, "jump_detected": False, "confidence": 0.0},
+            "cap_bulletin": cap_doc,
+            "sounding": seq_res.get("sounding", {}),
+            "raw_metadata": seq_res.get("metadata", {}),
+        }
+
+    # 3. Run ConvLSTM neural network inference
+    pred = _live_inference_service.run_prediction(
+        sequence_physical=seq_res["tensor"],
+        sounding_params=seq_res["sounding"],
+        station_name=station,
+        observation_timestamp=seq_res["timestamps"][-1],
+        forecast_steps=forecast_steps,
+        provenance=seq_res["provenance"],
+        mode=seq_res["mode"],
+        freshness=seq_res["freshness"],
+        data_note=seq_res["data_note"],
+    )
+
+    pred["location"] = {"lat": lat, "lon": lon}
+    pred["state"] = st_info.get("state", "Tamil Nadu")
+    pred["raw_metadata"] = seq_res.get("metadata", {})
+
+    # Phase 7: Attach AI risk assessment & active alerts to live nowcast
+    try:
+        assessment, active_alerts = alert_engine.evaluate_nowcast(pred)
+        pred["risk_assessment"] = assessment.to_dict()
+        pred["active_alerts"] = [a.to_dict() for a in active_alerts]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Alert engine evaluation failed: {e}")
+        pred["risk_assessment"] = None
+        pred["active_alerts"] = []
+
+    return pred
+
+
+@app.get("/api/live/status")
+async def live_pipeline_status():
+    """
+    Phase 5 Live Pipeline Status Endpoint:
+    Reports provider health, sensor freshness matrix, observation buffer occupancy, and active model state.
+    """
+    model, meta = _get_model()
+    scaler = ModelLoader.get_scaler()
+    buffer_count = _live_pipeline.observation_manager.frame_count
+    is_ready = _live_pipeline.observation_manager.is_sequence_ready()
+
+    return {
+        "status": "operational",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "active_model_mode": meta.get("active_mode", "real"),
+        "model_checkpoint": os.path.basename(meta.get("checkpoint_path", "convlstm_real_best.keras")),
+        "model_parameters": model.count_params() if model else 0,
+        "scaler_fitted": scaler.is_fitted,
+        "buffer": {
+            "capacity": 4,
+            "current_frames": buffer_count,
+            "sequence_ready": is_ready,
+            "cadence_minutes": 15,
+        },
+        "providers": {
+            "radar": {"name": _live_pipeline.radar.name, "source_type": _live_pipeline.radar.source_type},
+            "satellite": {"name": _live_pipeline.satellite.name, "source_type": _live_pipeline.satellite.source_type},
+            "lightning": {"name": _live_pipeline.lightning.name, "source_type": _live_pipeline.lightning.source_type},
+            "weather": {"name": _live_pipeline.weather.name, "source_type": _live_pipeline.weather.source_type},
+        },
     }
 
 
@@ -869,6 +1048,91 @@ async def get_state_convective_report_endpoint(state_slug: str):
 async def live_nodes():
     """Static metadata for the convective sampling nodes."""
     return {"nodes": CONVECTIVE_NODES, "count": len(CONVECTIVE_NODES), "domain": INDIA_BBOX}
+
+
+# ==============================================================================
+# PHASE 7: AI ALERTS, IMPACT PREDICTION & DECISION SUPPORT ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/alerts/active")
+async def get_active_alerts():
+    """
+    Return all currently active (non-expired, non-acknowledged) AI alerts.
+    """
+    store = alert_engine.store
+    alerts = store.get_active_alerts()
+    return {
+        "active_alerts": [a.to_dict() for a in alerts],
+        "count": len(alerts),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/alerts/history")
+async def get_alert_history(limit: int = 50):
+    """
+    Return historical alerts (including expired and acknowledged).
+    """
+    store = alert_engine.store
+    history = store.get_alert_history(limit=limit)
+    return {
+        "history": [a.to_dict() for a in history],
+        "count": len(history),
+        "limit": limit,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.post("/api/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert(alert_id: str, operator: str = "operator"):
+    """
+    Operator acknowledges an alert (marks it as handled).
+    """
+    store = alert_engine.store
+    result = store.acknowledge_alert(alert_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Alert '{alert_id}' not found.")
+    return {
+        "acknowledged": True,
+        "alert_id": alert_id,
+        "operator": operator,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/alerts/risk")
+async def get_current_risk():
+    """
+    Return the latest risk assessment from the most recent alert engine evaluation.
+    If no evaluation has been run yet, returns a NORMAL baseline.
+    """
+    last = alert_engine.last_assessment
+    if last is not None:
+        return {
+            "risk_assessment": last.to_dict(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    return {
+        "risk_assessment": {
+            "overall_risk": "NORMAL",
+            "risk_score": 0.0,
+            "components": [],
+            "sector_impacts": [],
+            "decision_support": [],
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/alerts/stats")
+async def get_alert_stats():
+    """
+    Alert store statistics: total issued, active, acknowledged, expired.
+    """
+    store = alert_engine.store
+    stats = store.get_stats()
+    stats["timestamp"] = datetime.now(timezone.utc).isoformat()
+    return stats
 
 
 # ==============================================================================
