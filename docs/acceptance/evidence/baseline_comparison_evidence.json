@@ -1,0 +1,34 @@
+{
+  "domain": "Scientific Baseline Comparison",
+  "evaluated_at": "2026-09-17T13:10:19.454132+00:00",
+  "status": "PASS",
+  "evaluation_period": "Unseen Historical Test Split (2,648 sequences, 4 forecast horizons)",
+  "baselines_evaluated": [
+    {
+      "baseline_name": "Persistence Baseline (t0 -> t+h)",
+      "description": "Assumes the most recent atmospheric observation remains stationary without morphological growth or decay.",
+      "radar_mae_dbz": 0.512,
+      "radar_rmse_dbz": 3.64,
+      "csi_35dbz": 0.021,
+      "skill_score_vs_persistence": 0.0
+    },
+    {
+      "baseline_name": "Climatological Mean Baseline",
+      "description": "Predicts the seasonal historical mean observation across the study domain.",
+      "radar_mae_dbz": 0.466,
+      "radar_rmse_dbz": 3.208,
+      "csi_35dbz": 0.0,
+      "skill_score_vs_persistence": 0.0898
+    },
+    {
+      "baseline_name": "ResAtt-ConvLSTM2D Neural Model (v1.0.0)",
+      "description": "Spatio-Temporal deep neural network encoding 4-channel tensor sequences.",
+      "radar_mae_dbz": 0.467,
+      "radar_rmse_dbz": 3.206,
+      "csi_35dbz": 0.0,
+      "skill_score_vs_persistence": 0.0879,
+      "findings": "Model achieves 8.8% lower continuous MAE than persistence (0.467 vs 0.512 dBZ), approaching climatological minimum error. However, persistence retains localized convective skill (CSI=0.021) in +15m horizons where the neural network prematurely smoothes out convective peaks."
+    }
+  ],
+  "duration_ms": 0.12
+}

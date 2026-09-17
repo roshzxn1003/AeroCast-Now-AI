@@ -1,0 +1,47 @@
+# ==============================================================================
+# AeroCast-Now AI: Staging Docker Compose Stack (Phase 12)
+# ==============================================================================
+services:
+  backend-staging:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aerocast-backend-staging
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    env_file:
+      - .env.staging
+    environment:
+      - AEROCAST_ENV=staging
+      - AEROCAST_DB_PATH=/app/data/staging/aerocast_staging.sqlite3
+      - AEROCAST_DATA_DIR=/app/data/staging
+    volumes:
+      - ./data/staging:/app/data/staging
+      - ./backend/models:/app/models:ro
+    networks:
+      - aerocast_staging_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  frontend-staging:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aerocast-frontend-staging
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      backend-staging:
+        condition: service_healthy
+    networks:
+      - aerocast_staging_net
+
+networks:
+  aerocast_staging_net:
+    driver: bridge

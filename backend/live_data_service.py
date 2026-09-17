@@ -389,8 +389,9 @@ class BlitzortungClient:
             return
 
         ssl_ctx = ssl.create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = ssl.CERT_NONE
+        if os.getenv("AEROCAST_INSECURE_SSL", "false").lower() == "true":
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
 
         for host in BLITZORTUNG_HOSTS:
             if self._stop.is_set():

@@ -25,21 +25,25 @@ export class ProceduralLightningManager {
   private scene: THREE.Scene;
   private activeStrikes: Map<string, ActiveStrikeMesh> = new Map();
   private flashLight: THREE.PointLight;
+  private sheetFlashLight: THREE.PointLight;
+  private ambientFlash: THREE.AmbientLight;
+  public onFlashChange?: (intensity: number) => void;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, onFlashChange?: (intensity: number) => void) {
     this.scene = scene;
+    this.onFlashChange = onFlashChange;
 
     // Transient point light for realistic atmospheric cloud & ground illumination.
-    //
-    // Range matters more than it looks: the globe has radius 100, so the
-    // previous 80-unit distance lit a cap roughly 45 degrees wide and every
-    // flash whited out the whole visible hemisphere, hiding the map for about
-    // a second. 30 units still reads as a large, dramatic flash -- real
-    // lightning lights cloud over ~100 km, which would be under two units
-    // here -- while keeping the illumination local to the storm rather than
-    // whiting out the whole hemisphere.
-    this.flashLight = new THREE.PointLight(0x7dd3fc, 0, 48, 1.8);
+    this.flashLight = new THREE.PointLight(0x7dd3fc, 0, 52, 1.8);
     this.scene.add(this.flashLight);
+
+    // Diffuse sheet light high in cloud mass for intra-cloud illumination
+    this.sheetFlashLight = new THREE.PointLight(0xbae6fd, 0, 110, 1.4);
+    this.scene.add(this.sheetFlashLight);
+
+    // Subtle atmospheric ambient flash across the entire visible hemisphere
+    this.ambientFlash = new THREE.AmbientLight(0x38bdf8, 0);
+    this.scene.add(this.ambientFlash);
   }
 
   /**
@@ -115,6 +119,11 @@ export class ProceduralLightningManager {
     this.flashLight.position.copy(type === 'CG' ? endCoords.clone().lerp(startCoords, 0.25) : startCoords);
     this.flashLight.intensity = 8.0 * intensity;
     this.flashLight.color.setHex(type === 'CG' ? 0xe0f2fe : 0xc084fc);
+
+    // Position diffuse sheet light higher in the storm cloud for realistic sky glow
+    this.sheetFlashLight.position.copy(startCoords.clone().multiplyScalar(1.025));
+    this.sheetFlashLight.intensity = 5.0 * intensity;
+    this.sheetFlashLight.color.setHex(type === 'CG' ? 0xbae6fd : 0xd8b4fe);
 
     const activeStrike: ActiveStrikeMesh = {
       id,
@@ -254,8 +263,11 @@ export class ProceduralLightningManager {
       }
     });
 
-    // Fade atmospheric point light
+    // Fade atmospheric thunder lights
     this.flashLight.intensity = maxLightIntensity * 7.5;
+    this.sheetFlashLight.intensity = maxLightIntensity * 4.5;
+    this.ambientFlash.intensity = maxLightIntensity * 0.35;
+    this.onFlashChange?.(maxLightIntensity);
   }
 
   private removeStrike(id: string) {
@@ -280,12 +292,19 @@ export class ProceduralLightningManager {
   public clear() {
     this.activeStrikes.forEach((_, id) => this.removeStrike(id));
     this.flashLight.intensity = 0;
+    this.sheetFlashLight.intensity = 0;
+    this.ambientFlash.intensity = 0;
+    this.onFlashChange?.(0);
   }
 
   public dispose() {
     this.clear();
     this.scene.remove(this.flashLight);
     this.flashLight.dispose();
+    this.scene.remove(this.sheetFlashLight);
+    this.sheetFlashLight.dispose();
+    this.scene.remove(this.ambientFlash);
+    this.ambientFlash.dispose();
   }
 }
 

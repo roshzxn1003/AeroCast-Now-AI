@@ -1,0 +1,61 @@
+# ==============================================================================
+# AeroCast-Now AI: Production Hardened Docker Compose Stack (Phase 12)
+# ==============================================================================
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aerocast-backend-prod
+    restart: always
+    env_file:
+      - .env.production
+    volumes:
+      # Persistent host SSD storage for SQLite WAL database and raw observations
+      - ./data:/app/data
+      # Read-only model weights mount (protects cryptographic model integrity)
+      - ./backend/models:/app/models:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      - aerocast_internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aerocast-frontend-prod
+    restart: always
+    ports:
+      - "80:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - aerocast_internal
+      - aerocast_public
+
+networks:
+  # Isolated internal network: Database and API cannot be directly probed from external net
+  aerocast_internal:
+    internal: true
+  # Public ingress network for Nginx reverse proxy
+  aerocast_public:
+    driver: bridge

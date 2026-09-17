@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-09-17T13:12:08.976924+00:00",
+  "source_db": "/home/arun-roshan-gj/SIH/data/aerocast.sqlite3",
+  "backup_path": "/home/arun-roshan-gj/SIH/data/backups/aerocast_dr_drill_20260917_131208.sqlite3.bak",
+  "backup_size_bytes": 1716224,
+  "timing_ms": {
+    "backup_creation_ms": 12.83,
+    "restoration_ms": 13.15,
+    "total_drill_duration_ms": 25.98
+  },
+  "recovery_objectives": {
+    "measured_rto_seconds": 0.026,
+    "operational_rto_target": "< 15 minutes",
+    "operational_rpo_target": "< 1 hour",
+    "backup_cadence": "hourly online WAL snapshot"
+  },
+  "integrity_check": "ok",
+  "table_parity": {
+    "observations": {
+      "source_rows": 657,
+      "restored_rows": 657,
+      "parity": true
+    },
+    "predictions": {
+      "source_rows": 24,
+      "restored_rows": 24,
+      "parity": true
+    },
+    "verifications": {
+      "source_rows": 4,
+      "restored_rows": 4,
+      "parity": true
+    },
+    "alerts": {
+      "source_rows": 0,
+      "restored_rows": 0,
+      "parity": true
+    },
+    "model_registry": {
+      "source_rows": 4,
+      "restored_rows": 4,
+      "parity": true
+    },
+    "raw_ingestion_log": {
+      "source_rows": 11,
+      "restored_rows": 11,
+      "parity": true
+    },
+    "schema_migrations": {
+      "source_rows": 5,
+      "restored_rows": 5,
+      "parity": true
+    }
+  },
+  "status": "VERIFIED_SUCCESSFUL"
+}

@@ -1,0 +1,70 @@
+# ==============================================================================
+# AeroCast-Now AI: Unified Local & Development Docker Compose Stack (Phase 12)
+# ==============================================================================
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aerocast-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - AEROCAST_ENV=development
+      - DATA_MODE=hybrid
+      - AEROCAST_DB_PATH=/app/data/aerocast.sqlite3
+      - AEROCAST_DATA_DIR=/app/data
+      - AEROCAST_ADMIN_TOKEN=${AEROCAST_ADMIN_TOKEN:-dev_admin_token_for_local_testing_only}
+      - AEROCAST_SECRET_KEY=${AEROCAST_SECRET_KEY:-dev_secret_key_change_in_production_1234567890}
+    volumes:
+      # Persistent Storage Mounts
+      - ./data:/app/data
+      - ./backend/models:/app/models
+    networks:
+      - aerocast_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aerocast-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - aerocast_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  dashboard:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aerocast-dashboard
+    profiles:
+      - dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./backend/models:/app/models
+    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+    networks:
+      - aerocast_net
+
+networks:
+  aerocast_net:
+    driver: bridge

@@ -50,8 +50,8 @@ IMD_STATION_MAP: Dict[str, str] = {
     "mumbai dwr (colaba/veravali)": "mum",
     "kolkata": "kol",
     "kolkata dwr (alipore)": "kol",
-    "chennai": "delhi",  # Fallback to high-capacity active DWR node when coastal feed rotates
-    "chennai dwr (sriharikota/port)": "delhi",
+    "chennai": "chn",  # Authentic IMD Chennai DWR station code
+    "chennai dwr (sriharikota/port)": "sri",  # Authentic Sriharikota DWR station code
     "hyderabad": "hyd",
     "hyderabad dwr (begumpet)": "hyd",
     "bhopal": "bhp",
@@ -88,8 +88,9 @@ SATELLITE_TTL_SECONDS = 900.0   # 15-minute INSAT-3D/3DR scan cycle
 RAINVIEWER_TTL_SECONDS = 600.0  # 10-minute RainViewer tile cycle
 
 _ssl_ctx = ssl.create_default_context()
-_ssl_ctx.check_hostname = False
-_ssl_ctx.verify_mode = ssl.CERT_NONE
+if os.getenv("AEROCAST_INSECURE_SSL", "false").lower() == "true":
+    _ssl_ctx.check_hostname = False
+    _ssl_ctx.verify_mode = ssl.CERT_NONE
 
 _cache_lock = threading.Lock()
 

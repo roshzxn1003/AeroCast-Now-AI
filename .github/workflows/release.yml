@@ -1,0 +1,48 @@
+name: AeroCast-Now AI — Production Release & Packaging
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release-package:
+    name: Package Release Artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12 & Node.js 22
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build Frontend Production Bundle
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Generate Release Manifest & Provenance
+        run: |
+          python scripts/generate_release_manifest.py --tag ${{ github.ref_name }}
+
+      - name: Archive Production Frontend Distribution
+        run: |
+          tar -czvf aerocast-frontend-${{ github.ref_name }}.tar.gz -C frontend/dist .
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            aerocast-frontend-${{ github.ref_name }}.tar.gz
+            reports/release_manifest.json
+          draft: false
+          prerelease: false
+          generate_release_notes: true

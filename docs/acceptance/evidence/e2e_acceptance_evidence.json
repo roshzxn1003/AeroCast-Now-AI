@@ -1,0 +1,173 @@
+{
+  "test_run_id": "ACCEPT-E2E-A7D89B3D",
+  "started_at": "2026-09-17T12:36:56.367539+00:00",
+  "environment": "testing",
+  "software_version": "v2.1.0",
+  "stages": {
+    "stage_1_observation_ingestion": {
+      "status": "PASS",
+      "source": "BLITZORTUNG",
+      "sample_obs_id": "OBS-LTG-RATE-E02C27BE04",
+      "latency_ms": 0.11
+    },
+    "stage_2_quality_control": {
+      "status": "PASS",
+      "input_value": 38.5,
+      "numerical_qc_flag": "VALID",
+      "spatial_qc_flag": "VALID",
+      "latency_ms": 0.01
+    },
+    "stage_3_physical_normalization": {
+      "status": "PASS",
+      "reconstruction_error": 0.0,
+      "channels_scaled": [
+        "radar_dbz",
+        "vil_kg_m2",
+        "satellite_tir_c",
+        "lightning_flash_density"
+      ],
+      "latency_ms": 0.18
+    },
+    "stage_4_spatial_alignment": {
+      "status": "PASS",
+      "region_name": "Tamil Nadu / Chennai",
+      "grid_size": 32,
+      "temporal_resolution_min": 15,
+      "bounds": [
+        12.0,
+        14.5,
+        79.0,
+        81.5
+      ],
+      "latency_ms": 0.0
+    },
+    "stage_5_feature_generation": {
+      "status": "PASS",
+      "tensor_shape": [
+        4,
+        32,
+        32,
+        4
+      ],
+      "input_timesteps": 4,
+      "latency_ms": 0.05
+    },
+    "stage_6_model_inference": {
+      "status": "PASS",
+      "model_architecture": "Residual-Attention ConvLSTM2D (ResAtt-ConvLSTM2D)",
+      "model_parameters": 191524,
+      "active_weights": "convlstm_real_best.keras",
+      "model_mode": "real",
+      "inference_latency_ms": 132.69
+    },
+    "stage_7_forecast_generation": {
+      "status": "PASS",
+      "forecast_shape": [
+        4,
+        32,
+        32,
+        4
+      ],
+      "lead_times_min": [
+        15,
+        30,
+        45,
+        60
+      ],
+      "max_predicted_dbz": 3.71,
+      "latency_ms": 446.06
+    },
+    "stage_8_storm_tracking": {
+      "status": "PASS",
+      "cells_detected": 0,
+      "cells": [],
+      "latency_ms": 0.26
+    },
+    "stage_9_verification": {
+      "status": "PASS",
+      "prediction_id": "PRED-D58C44FA",
+      "verification_id": "VERIF-EC619216B8B2",
+      "dbz_error": null,
+      "latency_ms": 4.85
+    },
+    "stage_10_risk_assessment": {
+      "status": "PASS",
+      "risk_score": 19.67857142857143,
+      "risk_level": "NORMAL",
+      "primary_driver": "Lightning & Jump Precursor (35/100, weighted 8.8 pts)",
+      "is_alert_triggered": false,
+      "disclaimer_present": true,
+      "latency_ms": 9.26
+    },
+    "stage_11_decision_support": {
+      "status": "PASS",
+      "alert_count": 0,
+      "alerts": [],
+      "latency_ms": 0.0
+    },
+    "stage_12_api_serving": {
+      "status": "PASS",
+      "probes_tested": [
+        "/api/radar-grid",
+        "/health",
+        "/ready"
+      ],
+      "radar_grid_status": 200,
+      "readiness_status": 200,
+      "latency_ms": 4239.32
+    },
+    "stage_13_globe_presentation": {
+      "status": "PASS",
+      "globe_layers_verified": [
+        "district_risk_polygons",
+        "convective_heat_grid",
+        "lightning_points"
+      ],
+      "latency_ms": 6.78
+    },
+    "stage_14_operational_state": {
+      "status": "PASS",
+      "system_state": "HEALTHY",
+      "components": [
+        "database",
+        "storage",
+        "model",
+        "providers"
+      ],
+      "latency_ms": 3682.24
+    },
+    "stage_15_tracing_logging": {
+      "status": "PASS",
+      "correlation_id_propagated": true,
+      "header_received": "corr-9ef523cf1ba1",
+      "latency_ms": 2.3
+    },
+    "stage_16_system_telemetry": {
+      "status": "PASS",
+      "rss_memory_mb": null,
+      "system_memory_percent": null,
+      "disk_free_gb": null,
+      "latency_ms": 3.95
+    },
+    "stage_17_security_rbac": {
+      "status": "PASS",
+      "security_headers": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block"
+      },
+      "rbac_unauthorized_status": 403,
+      "latency_ms": 12.45
+    },
+    "stage_18_audit_recording": {
+      "status": "PASS",
+      "audit_action": "ACCEPTANCE_E2E_COMPLETE",
+      "timestamp": "2026-09-17T12:37:04.908848+00:00",
+      "latency_ms": 0.27
+    }
+  },
+  "failures": [],
+  "overall_status": "PASS",
+  "total_duration_ms": 8541.46,
+  "completed_at": "2026-09-17T12:37:04.909137+00:00"
+}

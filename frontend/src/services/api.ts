@@ -25,6 +25,21 @@ import {
 
 const API_BASE = '/api';
 
+/** Safe fetch wrapper with bounded timeout and abort signal. */
+export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // Fallback simulated stations
 export const DEFAULT_STATIONS: RadarStation[] = [
   { name: 'Chennai DWR (Sriharikota/Port)', lat: 13.0827, lon: 80.2707, state: 'Tamil Nadu', radar_type: 'S-Band Doppler (IMD)', range_km: 250, freq_ghz: 2.8, base_cape: 2450, base_cin: -45, base_shear: 22 },
@@ -42,7 +57,7 @@ export const DEFAULT_STATIONS: RadarStation[] = [
 
 export async function fetchHealth(): Promise<SystemHealth> {
   try {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await fetchWithTimeout(`${API_BASE}/health`, {}, 8000);
     if (!res.ok) throw new Error(`Health check failed: ${res.statusText}`);
     return await res.json();
   } catch {
@@ -64,7 +79,7 @@ export async function fetchHealth(): Promise<SystemHealth> {
 
 export async function fetchStations(): Promise<RadarStation[]> {
   try {
-    const res = await fetch(`${API_BASE}/stations`);
+    const res = await fetchWithTimeout(`${API_BASE}/stations`, {}, 8000);
     if (!res.ok) throw new Error(`Fetch stations failed: ${res.statusText}`);
     const data = await res.json();
     return data.stations || DEFAULT_STATIONS;
@@ -75,7 +90,7 @@ export async function fetchStations(): Promise<RadarStation[]> {
 
 export async function fetchModelInfo(): Promise<ModelMetadata> {
   try {
-    const res = await fetch(`${API_BASE}/model-info`);
+    const res = await fetchWithTimeout(`${API_BASE}/model-info`, {}, 8000);
     if (!res.ok) throw new Error(`Fetch model info failed: ${res.statusText}`);
     return await res.json();
   } catch {
@@ -119,7 +134,7 @@ export async function fetchNowcast(
       storm_mode: stormMode,
       forecast_steps: String(forecastSteps),
     });
-    const res = await fetch(`${API_BASE}/nowcast?${params.toString()}`);
+    const res = await fetchWithTimeout(`${API_BASE}/nowcast?${params.toString()}`, {}, 15000);
     if (!res.ok) throw new Error(`Nowcast fetch failed: ${res.statusText}`);
     return await res.json();
   } catch {
@@ -140,7 +155,7 @@ export async function fetchLiveNowcast(
       forecast_steps: String(forecastSteps),
       data_mode: dataMode,
     });
-    const res = await fetch(`${API_BASE}/live/nowcast?${params.toString()}`);
+    const res = await fetchWithTimeout(`${API_BASE}/live/nowcast?${params.toString()}`, {}, 15000);
     if (!res.ok) throw new Error(`Live nowcast fetch failed: ${res.statusText}`);
     return await res.json();
   } catch (err) {
@@ -151,7 +166,7 @@ export async function fetchLiveNowcast(
 
 export async function fetchLiveStatus(): Promise<LivePipelineStatus | null> {
   try {
-    const res = await fetch(`${API_BASE}/live/status`);
+    const res = await fetchWithTimeout(`${API_BASE}/live/status`, {}, 8000);
     if (!res.ok) throw new Error(`Live status fetch failed: ${res.statusText}`);
     return await res.json();
   } catch (err) {

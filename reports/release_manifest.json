@@ -1,0 +1,49 @@
+{
+  "application": "AeroCast-Now AI Pro",
+  "release_version": "v2.1.0",
+  "generated_at": "2026-09-16T19:29:43.361649+00:00",
+  "git": {
+    "commit_sha": "a6aa9aa5ba2ae231bac7567a10285ed12a5f52d0",
+    "branch": "main",
+    "is_dirty": true
+  },
+  "model_provenance": {
+    "model_id": "convlstm_real_best",
+    "model_version": "1.0.0",
+    "architecture": "ResAtt-ConvLSTM2D",
+    "parameter_count": 191524,
+    "weights_file": "backend/models/convlstm_real_best.keras",
+    "file_size_bytes": 2356306,
+    "sha256_checksum": "6194f04a8ae4756dca8bf11d4627c350873bec25c8ad20e0b0ca9137fc603e87"
+  },
+  "database_provenance": {
+    "current_schema_version": 5,
+    "applied_versions": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "system_specifications": {
+    "python_version": "3.12.13",
+    "input_tensor_shape": [
+      1,
+      4,
+      32,
+      32,
+      4
+    ],
+    "forecast_horizons_min": [
+      15,
+      30,
+      45,
+      60,
+      90,
+      120
+    ],
+    "spatial_resolution_km": 4.0,
+    "temporal_resolution_min": 15
+  }
+}

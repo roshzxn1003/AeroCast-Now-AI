@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-09-16T19:22:06Z",
+  "hardware": {
+    "type": "cpu",
+    "device": "CPU (AVX2/FMA vector instruction set)",
+    "gpu_count": 0,
+    "cpu_threads": 12
+  },
+  "model": {
+    "model_id": "convlstm_real_best",
+    "model_version": "1.0.0",
+    "parameter_count": 191524,
+    "input_shape": [
+      null,
+      4,
+      32,
+      32,
+      4
+    ],
+    "output_shape": [
+      null,
+      4,
+      32,
+      32,
+      4
+    ]
+  },
+  "timing_ms": {
+    "load_time_ms": 858.99,
+    "warmup_time_ms": 59.36,
+    "total_startup_ms": 918.35,
+    "inference_mean_ms": 124.66,
+    "inference_median_ms": 116.06,
+    "inference_p90_ms": 161.39,
+    "inference_p95_ms": 178.06,
+    "inference_p99_ms": 179.82,
+    "inference_min_ms": 105.55,
+    "inference_max_ms": 180.01,
+    "inference_std_ms": 21.75
+  },
+  "throughput": {
+    "inferences_per_second": 8.02,
+    "iterations_tested": 25,
+    "batch_size": 1
+  },
+  "memory_mb": {
+    "initial_process_rss_mb": 655.12,
+    "after_model_load_rss_mb": 735.81,
+    "model_delta_rss_mb": 80.69,
+    "final_rss_mb": 754.48
+  }
+}

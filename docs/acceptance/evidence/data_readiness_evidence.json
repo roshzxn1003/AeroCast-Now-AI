@@ -1,0 +1,74 @@
+{
+  "domain": "Data Readiness",
+  "evaluated_at": "2026-09-17T13:10:19.453270+00:00",
+  "status": "PASS",
+  "active_data_mode": "hybrid",
+  "providers": {
+    "IMD_RADAR": {
+      "dataset": "Doppler Weather Radar (Chennai / Sriharikota / Karaikal)",
+      "geographic_coverage": "Tamil Nadu Coastal & Inland Convective Corridor (12.0\u00b0N\u201314.5\u00b0N, 79.0\u00b0E\u201381.5\u00b0E)",
+      "temporal_resolution": "10 minutes",
+      "spatial_resolution": "500 m polar -> 4.0 km Cartesian (32x32 grid)",
+      "update_frequency": "Every 10\u201315 minutes",
+      "latency": "5\u201312 minutes post-scan",
+      "access_method": "IMD Open Data Portal REST API / Local Staging Cache",
+      "license_constraints": "Government of India National Data Sharing and Accessibility Policy (NDSAP)",
+      "authentication": "API Key header (IMD_API_KEY) in production; simulated/cached in dev",
+      "historical_availability": "Archived scans available for selected convective storm events (2020\u20132024)",
+      "known_limitations": "Ground clutter around urban Chennai; beam blockage along Western Ghats; occasional 20-40 min feed outages during severe cyclone squalls",
+      "backup_source": "INSAT-3D TIR cold cloud-top proxy + WRF NWP radar reflectivity diagnostic",
+      "health": "HEALTHY (Operating in hybrid cached/real mode)"
+    },
+    "INSAT_3D_SATELLITE": {
+      "dataset": "INSAT-3D / 3DR Imager Thermal Infrared Channel 1 (TIR-1: 10.8 \u00b5m)",
+      "geographic_coverage": "South Asia / Indian Ocean Synoptic Coverage (Full Disk)",
+      "temporal_resolution": "15 minutes (Half-hourly rapid scan during tropical cyclones)",
+      "spatial_resolution": "4.0 km at nadir",
+      "update_frequency": "Every 15 minutes",
+      "latency": "15\u201325 minutes processing delay",
+      "access_method": "MOSDAC (ISRO Meteorological and Oceanographic Satellite Data Archival Centre)",
+      "license_constraints": "ISRO / MOSDAC Academic & Research Data Policy",
+      "authentication": "MOSDAC Credentials for automated FTP/HTTPS pull",
+      "historical_availability": "Continuous archival since 2014 on MOSDAC",
+      "known_limitations": "Parallax shift near edges; cirrus anvil contamination obscuring boundary layer convection",
+      "backup_source": "Himawari-9 / EUMETSAT IODC public browse feeds",
+      "health": "HEALTHY (Synchronized to 15m cadence)"
+    },
+    "BLITZORTUNG_LIGHTNING": {
+      "dataset": "Total Lightning Strike Arrival Time Difference (TOA / ATD)",
+      "geographic_coverage": "Global network with ~35 receiver stations covering Indian Subcontinent",
+      "temporal_resolution": "1 millisecond timestamp resolution, aggregated to 5-minute epochs",
+      "spatial_resolution": "Station density dependent (~2\u20135 km localization accuracy)",
+      "update_frequency": "Continuous streaming WebSocket / HTTP batching",
+      "latency": "< 30 seconds",
+      "access_method": "Blitzortung community participant feed",
+      "license_constraints": "Non-commercial community use only; requires raw sensor contribution or academic waiver",
+      "authentication": "Participant authentication token",
+      "historical_availability": "Archived stroke records accessible via Blitzortung archive APIs",
+      "known_limitations": "Detection efficiency lower over open Bay of Bengal (> 200 km offshore); biased toward strong CG strokes over IC flashes",
+      "backup_source": "GLM / ENTLN operational lightning feeds",
+      "health": "HEALTHY (Real-time TCP/WS ingestion active)"
+    },
+    "OPEN_METEO_NWP": {
+      "dataset": "Numerical Weather Prediction Soundings & Convective Diagnostics (ECMWF IFS / GFS)",
+      "geographic_coverage": "Global 0.1\u00b0 (~11 km) gridded NWP model",
+      "temporal_resolution": "1 hour forecast steps",
+      "spatial_resolution": "11 km interpolated to study domain",
+      "update_frequency": "Every 6 hours (00, 06, 12, 18 UTC cycles)",
+      "latency": "1.5\u20132 hours post-model-run",
+      "access_method": "Open-Meteo REST API (Keyless / Fair-Use)",
+      "license_constraints": "Open Data Commons Attribution License (ODC-By)",
+      "authentication": "Keyless tier (subject to 10,000 calls/day rate limit)",
+      "historical_availability": "ERA5 reanalysis available back to 1940; operational forecasts back to 2022",
+      "known_limitations": "NWP cannot resolve sub-km convective updraft cores; provides synoptic boundary forcing only",
+      "backup_source": "IMD GFS-T1534 regional model soundings",
+      "health": "HEALTHY"
+    }
+  },
+  "data_isolation_enforced": {
+    "simulation_mode_blocked_in_production": true,
+    "raw_ingestion_deduplication": true,
+    "qc_filtering_active": true
+  },
+  "duration_ms": 0.19
+}

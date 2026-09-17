@@ -98,6 +98,8 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   const cloudsMeshRef = useRef<THREE.Mesh | null>(null);
   const radarMeshRef = useRef<THREE.InstancedMesh | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const flashOverlayRef = useRef<HTMLDivElement | null>(null);
+  const strikeTimerRef = useRef<number | null>(null);
 
   const [ready, setReady] = useState(false);
   const [hovered, setHovered] = useState<ConvectiveNode | null>(null);
@@ -305,7 +307,11 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
     // -------------------------------------------------------------------------
     // 2. Procedural Lightning Engine Setup
     // -------------------------------------------------------------------------
-    const lightningManager = new ProceduralLightningManager(globe.scene());
+    const lightningManager = new ProceduralLightningManager(globe.scene(), (intensity) => {
+      if (flashOverlayRef.current) {
+        flashOverlayRef.current.style.opacity = (intensity * 0.45).toFixed(3);
+      }
+    });
     lightningManagerRef.current = lightningManager;
 
     // -------------------------------------------------------------------------
@@ -701,53 +707,167 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
   }, [combinedRings, ready]);
 
   // ---------------------------------------------------------------------------
-  // 10. Procedural Lightning Discharges & Audio Sync
+  // 10. Procedural Lightning Discharges & Thunder Visual Loop
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const globe = globeRef.current;
     const lightningManager = lightningManagerRef.current;
+
+    // Clean up any existing scheduled loop timer
+    if (strikeTimerRef.current !== null) {
+      window.clearTimeout(strikeTimerRef.current);
+      strikeTimerRef.current = null;
+    }
+
     if (
       !globe ||
       !lightningManager ||
       !ready ||
-      strikes.length === 0 ||
       !layers.lightning ||
       layers.lightningMode === 'density'
-    )
+    ) {
+      lightningManager?.clear();
       return;
+    }
 
-    const freshStrikes = strikes.filter((s) => s.age_s <= 45).slice(0, 12);
+    interface DischargeTarget {
+      lat: number;
+      lon: number;
+      type: 'CG' | 'IC';
+      intensity: number;
+    }
 
-    freshStrikes.forEach((strike, idx) => {
-      const start = globe.getCoords(strike.lat, strike.lon, 0.045);
+    const targets: DischargeTarget[] = [];
+
+    // 1. Add real recent lightning strikes
+    if (strikes.length > 0) {
+      const recent = strikes.filter((s) => s.age_s <= 300);
+      const pool = recent.length > 0 ? recent : strikes.slice(0, 30);
+      pool.forEach((s) => {
+        targets.push({
+          lat: s.lat,
+          lon: s.lon,
+          type: s.type,
+          intensity: Math.min(1.0, 0.65 + Math.random() * 0.35),
+        });
+      });
+    }
+
+    // 2. Add active severe convective storm cells if available
+    if (currentCells && currentCells.length > 0) {
+      currentCells
+        .filter((c) => c.max_dbz >= 36)
+        .forEach((cell) => {
+          const pt = gridPixelToGeo(
+            cell.centroid_pixel[0],
+            cell.centroid_pixel[1],
+            stationCoords.lat,
+            stationCoords.lon,
+            stationCoords.range_km,
+            32
+          );
+          targets.push({
+            lat: pt.lat,
+            lon: pt.lon,
+            type: Math.random() > 0.4 ? 'CG' : 'IC',
+            intensity: Math.min(1.0, 0.6 + (cell.max_dbz - 36) / 25),
+          });
+        });
+    }
+
+    // If no lightning or convective targets active, keep scene quiet
+    if (targets.length === 0) {
+      lightningManager.clear();
+      return;
+    }
+
+    let isDisposed = false;
+    let strikeIndex = 0;
+
+    const fireDischarge = (target: DischargeTarget) => {
+      if (isDisposed || !globe || !lightningManagerRef.current) return;
+
+      // Add slight spatial jitter (+-0.12 deg) across thundercloud footprint
+      const jitterLat = target.lat + (Math.random() - 0.5) * 0.24;
+      const jitterLon = target.lon + (Math.random() - 0.5) * 0.24;
+      const isIC = target.type === 'IC' || Math.random() < 0.35;
+
+      const start = globe.getCoords(jitterLat, jitterLon, 0.048);
       const end = globe.getCoords(
-        strike.lat + (strike.type === 'IC' ? 0.25 : 0),
-        strike.lon + (strike.type === 'IC' ? 0.25 : 0),
-        strike.type === 'IC' ? 0.038 : 0.005
+        jitterLat + (isIC ? (Math.random() - 0.5) * 0.28 : 0),
+        jitterLon + (isIC ? (Math.random() - 0.5) * 0.28 : 0),
+        isIC ? 0.038 : 0.005
       );
 
       if (start && end) {
         const startVec = new THREE.Vector3(start.x, start.y, start.z);
         const endVec = new THREE.Vector3(end.x, end.y, end.z);
-        const intensity = Math.min(1.0, 0.6 + Math.random() * 0.4);
+        strikeIndex = (strikeIndex + 1) % 1000;
 
-        lightningManager.triggerStrike(
-          `strike-${idx}-${strike.lat.toFixed(2)}-${strike.lon.toFixed(2)}`,
+        lightningManagerRef.current.triggerStrike(
+          `strike-loop-${strikeIndex}-${Date.now()}`,
           startVec,
           endVec,
-          strike.type,
-          intensity
+          isIC ? 'IC' : 'CG',
+          target.intensity
         );
-      }
-    });
 
-    if (strikes.length > lastStrikeCountRef.current && soundEnabled) {
-      const newest = strikes[0];
-      const pan = Math.max(-0.8, Math.min(0.8, (newest.lon - 80.0) / 12.0));
-      thunderAudio.play(0.85, newest.type === 'CG', pan);
-    }
-    lastStrikeCountRef.current = strikes.length;
-  }, [strikes, ready, soundEnabled, layers.lightning, layers.lightningMode]);
+        // Acoustic thunder sync with physical speed-of-sound propagation delay
+        if (soundEnabled) {
+          const pan = Math.max(-0.85, Math.min(0.85, (jitterLon - 80.0) / 12.0));
+          const acousticDelayMs = isIC ? 160 + Math.random() * 180 : 70 + Math.random() * 100;
+          window.setTimeout(() => {
+            if (!isDisposed) {
+              thunderAudio.play(target.intensity * 0.85, !isIC, pan);
+            }
+          }, acousticDelayMs);
+        }
+      }
+    };
+
+    const scheduleNextStrike = () => {
+      if (isDisposed) return;
+
+      // Pick a target from active pool
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      fireDischarge(target);
+
+      // 18% chance of rapid double-stroke in the same convective cell
+      if (Math.random() < 0.18) {
+        window.setTimeout(() => {
+          if (!isDisposed) {
+            fireDischarge(target);
+          }
+        }, 130 + Math.random() * 90);
+      }
+
+      // Dynamic thunder cadence: faster for high storm count, slower for isolated strikes
+      const baseDelay = targets.length > 15 ? 750 : targets.length > 5 ? 1200 : 1800;
+      const nextInterval = baseDelay + Math.random() * 950;
+
+      strikeTimerRef.current = window.setTimeout(scheduleNextStrike, nextInterval);
+    };
+
+    // Kick off visual loop immediately
+    scheduleNextStrike();
+
+    return () => {
+      isDisposed = true;
+      if (strikeTimerRef.current !== null) {
+        window.clearTimeout(strikeTimerRef.current);
+        strikeTimerRef.current = null;
+      }
+      lightningManager.clear();
+    };
+  }, [
+    strikes,
+    currentCells,
+    stationCoords,
+    ready,
+    soundEnabled,
+    layers.lightning,
+    layers.lightningMode,
+  ]);
 
   // ---------------------------------------------------------------------------
   // 11. Convective Sounding Nodes (Vigour Columns)
@@ -958,6 +1078,18 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
         aria-label="Interactive 3D Convective Earth Globe with Real Radar and AI Nowcasting"
       />
 
+      {/* Visual Thunder Atmospheric Flash Vignette */}
+      <div
+        ref={flashOverlayRef}
+        className="absolute inset-0 pointer-events-none z-10 transition-opacity duration-75"
+        style={{
+          opacity: 0,
+          background:
+            'radial-gradient(ellipse at center, rgba(224,242,254,0.22) 0%, rgba(56,189,248,0.12) 45%, rgba(14,165,233,0.02) 100%)',
+          mixBlendMode: 'screen',
+        }}
+      />
+
       {/* District layer: boundaries, live choropleth, search, detail panel & unified legend */}
       <DistrictOverlay
         globe={ready ? globeRef.current : null}
@@ -981,41 +1113,58 @@ export const LightningGlobe: React.FC<LightningGlobeProps> = ({
                   Flashes / 30m
                 </span>
               </div>
-              {/* Mode & Provenance Badge */}
-              {nowcastData?.provenance ? (
-                nowcastData.provenance.includes('SIMULAT') ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                    SIMULATION
-                  </span>
-                ) : nowcastData.provenance === 'LIVE_REAL_DATA' || nowcastData.mode === 'real' ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    LIVE REAL
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    HYBRID
-                  </span>
-                )
-              ) : (
-                lightning?.status && <ProvenanceBadge provenance={lightning.status} className="hidden md:inline-flex" />
-              )}
+              {/* Step 44: Explicit 5-State Operational Mode & Provenance Badge */}
+              {(() => {
+                const prov = nowcastData?.provenance?.toUpperCase() || '';
+                const mode = (nowcastData?.mode || '').toLowerCase();
+                const freshness = nowcastData?.freshness?.overall_status?.toLowerCase();
+                const isStale = freshness === 'stale' || freshness === 'delayed';
 
-              {/* Freshness Badge */}
-              {nowcastData?.freshness?.overall_status && (
+                if (prov.includes('SIMULAT') || mode === 'simulated') {
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                      SIMULATION
+                    </span>
+                  );
+                } else if (prov.includes('HISTORICAL') || prov.includes('REPLAY')) {
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                      HISTORICAL
+                    </span>
+                  );
+                } else if (isStale) {
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                      STALE OBS
+                    </span>
+                  );
+                } else if (prov.includes('HYBRID') || prov.includes('FALLBACK') || mode === 'degraded') {
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      DEGRADED
+                    </span>
+                  );
+                } else {
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      LIVE
+                    </span>
+                  );
+                }
+              })()}
+
+              {/* Step 43: Relative Freshness Badge */}
+              {nowcastData?.timestamp && (
                 <span
-                  title={nowcastData.freshness.summary_message || `Data freshness: ${nowcastData.freshness.overall_status}`}
-                  className={`text-[9px] font-mono px-1.5 py-0.5 rounded hidden lg:inline-flex items-center gap-1 ${
-                    nowcastData.freshness.overall_status === 'fresh'
-                      ? 'text-emerald-400 bg-emerald-950/50 border border-emerald-500/30'
-                      : nowcastData.freshness.overall_status === 'delayed'
-                      ? 'text-amber-400 bg-amber-950/50 border border-amber-500/30'
-                      : 'text-rose-400 bg-rose-950/50 border border-rose-500/30'
-                  }`}
+                  title={`Generated at: ${nowcastData.timestamp}`}
+                  className="text-[9px] font-mono px-2 py-0.5 rounded-full hidden md:inline-flex items-center gap-1 text-slate-300 bg-slate-900/70 border border-slate-700/50"
                 >
-                  ● {nowcastData.freshness.overall_status.toUpperCase()}
+                  ⏱ Live Sync
                 </span>
               )}
             </div>

@@ -1,0 +1,163 @@
+{
+  "domain": "ML Model Readiness & Scientific Validation",
+  "evaluated_at": "2026-09-17T13:10:19.453692+00:00",
+  "status": "PARTIAL",
+  "verdict_rationale": "Model architecture (ResAtt-ConvLSTM2D) and inference pipeline are mathematically sound. However, evaluation on real-world historical data reveals severe convective underprediction (CSI=0.0 at 35 dBZ) caused by class imbalance in the 464 training samples. The model is NOT validated for autonomous life-safety alerting.",
+  "production_candidate": {
+    "model_id": "convlstm_real_best",
+    "version": "1.0.0",
+    "architecture": "Residual-Attention ConvLSTM2D (ResAtt-ConvLSTM2D)",
+    "parameter_count": 191524,
+    "weights_file": "backend/models/convlstm_real_best.keras",
+    "sha256_registered": "6194f04a8ae4756dca8bf11d4627c350873bec25c8ad20e0b0ca9137fc603e87",
+    "training_samples_seen": 464,
+    "test_samples_unseen": 2648
+  },
+  "scientific_split_protocol": {
+    "separation_type": "Strict Temporal Separation (Train Period A vs Unseen Test Period C)",
+    "cross_leakage_prevention": "Normalization fit strictly on X_train only; no future observation leak"
+  },
+  "measured_metrics_by_horizon": {
+    "+15m": {
+      "lead_time_minutes": 15,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.001,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    },
+    "+30m": {
+      "lead_time_minutes": 30,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.0,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    },
+    "+45m": {
+      "lead_time_minutes": 45,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.0,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    },
+    "+60m": {
+      "lead_time_minutes": 60,
+      "CSI": 0.0,
+      "POD": 0.0,
+      "FAR": 0.0,
+      "HSS": 0.0,
+      "reflectivity_mae_dbz": 0.47,
+      "reflectivity_rmse_dbz": 3.21,
+      "flash_mae": 0.0,
+      "contingency": {
+        "hits": 0,
+        "misses": 464,
+        "false_alarms": 0,
+        "correct_negatives": 2711088
+      }
+    }
+  },
+  "categorical_scores_at_thresholds": {
+    "25_dBZ": {
+      "hits": 0,
+      "misses": 48688,
+      "false_alarms": 0,
+      "correct_negatives": 10797520,
+      "CSI_Threat_Score": 0.0,
+      "Probability_of_Detection_POD": 0.0,
+      "False_Alarm_Ratio_FAR": 0.0,
+      "Heidke_Skill_Score_HSS": 0.0
+    },
+    "35_dBZ": {
+      "hits": 0,
+      "misses": 1856,
+      "false_alarms": 0,
+      "correct_negatives": 10844352,
+      "CSI_Threat_Score": 0.0,
+      "Probability_of_Detection_POD": 0.0,
+      "False_Alarm_Ratio_FAR": 0.0,
+      "Heidke_Skill_Score_HSS": 0.0
+    },
+    "45_dBZ": {
+      "hits": 0,
+      "misses": 0,
+      "false_alarms": 0,
+      "correct_negatives": 10846208,
+      "CSI_Threat_Score": 0.0,
+      "Probability_of_Detection_POD": 0.0,
+      "False_Alarm_Ratio_FAR": 0.0,
+      "Heidke_Skill_Score_HSS": 0.5001
+    }
+  },
+  "continuous_channel_errors": {
+    "radar_dbz": {
+      "MAE": 0.467,
+      "RMSE": 3.206,
+      "observed_mean": 0.466,
+      "predicted_mean": 0.001
+    },
+    "vil_kg_m2": {
+      "MAE": 0.036,
+      "RMSE": 0.389,
+      "observed_mean": 0.035,
+      "predicted_mean": 0.001
+    },
+    "satellite_tir_c": {
+      "MAE": 8.199,
+      "RMSE": 9.456,
+      "observed_mean": 26.795,
+      "predicted_mean": 34.993
+    },
+    "lightning_flash_density": {
+      "MAE": 0.0,
+      "RMSE": 0.008,
+      "observed_mean": 0.0,
+      "predicted_mean": 0.0
+    }
+  },
+  "synthetic_vs_real_comparison": {
+    "synthetic_training": {
+      "training_samples": 128,
+      "CSI_35dBZ": 0.837,
+      "POD_35dBZ": 0.905,
+      "FAR_35dBZ": 0.083,
+      "note": "Optimistic benchmark evaluated on procedural synthetic convective vortexes."
+    },
+    "real_world_historical_training": {
+      "training_samples": 464,
+      "CSI_35dBZ": 0.0,
+      "POD_35dBZ": 0.0,
+      "FAR_35dBZ": 0.0,
+      "reflectivity_mae_dbz": 0.467,
+      "note": "Trained on real ERA5/IMD data. Low MAE due to vast clear-air background, but zero hit skill on rare convective peaks."
+    }
+  },
+  "calibration_status": "Deterministic forecast \u2014 probabilistic calibration not currently available",
+  "duration_ms": 0.19
+}

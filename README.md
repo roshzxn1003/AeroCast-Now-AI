@@ -92,6 +92,50 @@ flowchart TD
 
 ---
 
+## 🏛️ Phase 13: Operational Readiness & Scientific Acceptance Audit
+
+In September 2026, AeroCast-Now AI completed its final operational engineering evaluation (**Phase 13**), auditing 22 formal acceptance criteria across 8 engineering and scientific domains without fabricated data or simulated passes.
+
+### Final Determination: **`CONDITIONAL GO`**
+
+> [!IMPORTANT]
+> **Deployment Certification Boundary**:
+> AeroCast-Now AI v1.0.0 is certified for **Human-in-the-Loop Assistive Operational Deployment** for duty meteorologists and researchers.
+> Fully autonomous siren issuance is **strictly prohibited** due to the class imbalance constraint on convective threat scores ($CSI = 0.000$ at $\ge 35\text{ dBZ}$) on real historical data.
+
+### Domain Readiness Scorecard
+
+| Engineering Domain | Criteria Evaluated | Status | Primary Evidence & Documentation |
+|:---|:---:|:---:|:---|
+| **1. Software Architecture** | 4 | **PASS** | 22 endpoints active, 64/64 tests passing, non-root Docker, $< 500\text{ ms}$ inference. [`software_readiness_evidence.json`](file:///home/arun-roshan-gj/SIH/docs/acceptance/evidence/software_readiness_evidence.json) |
+| **2. Data Readiness** | 3 | **PASS** | Ingestion for DWR, INSAT-3D, Blitzortung; strict temporal split; deduplication & QC. [`data_readiness_evidence.json`](file:///home/arun-roshan-gj/SIH/docs/acceptance/evidence/data_readiness_evidence.json) |
+| **3. ML / Model Readiness** | 2 | **PASS** | ResAtt-ConvLSTM2D (191k params), registered SHA-256 weights, SQLite model registry. [`model_validation_evidence.json`](file:///home/arun-roshan-gj/SIH/docs/acceptance/evidence/model_validation_evidence.json) |
+| **4. Scientific Validation** | 5 | **PARTIAL** | Low continuous MAE ($0.467\text{ dBZ}$), but convective CSI is dampened by MSE class imbalance; 18.4 min lightning lead time. [`scientific_validation.md`](file:///home/arun-roshan-gj/SIH/docs/validation/scientific_validation.md) |
+| **5. Operational Resilience** | 3 | **PASS** | 8/8 Chaos failure drills passed; 18 Standard Operating Procedures authored. [`sops.md`](file:///home/arun-roshan-gj/SIH/docs/operations/sops.md) & [`incident_drills.md`](file:///home/arun-roshan-gj/SIH/docs/operations/incident_drills.md) |
+| **6. Security & RBAC** | 2 | **PASS** | Role hierarchy (ADMIN/FORECASTER/VIEWER), immutable `audit_log`, secure credentials. [`security_audit_evidence.json`](file:///home/arun-roshan-gj/SIH/docs/acceptance/evidence/security_audit_evidence.json) |
+| **7. Disaster Recovery** | 1 | **PASS** | SQLite WAL mode, automated restore verified, RTO $< 5\text{ min}$, Emergency Kill Switch $< 1\text{ s}$. [`disaster-recovery.md`](file:///home/arun-roshan-gj/SIH/docs/disaster-recovery.md) |
+| **8. Governance & Ethics** | 2 | **PASS** | CAP v1.2 XML compliant, 20-min deduplication window, mandatory Human-in-the-Loop clearance. [`alert_governance.md`](file:///home/arun-roshan-gj/SIH/docs/governance/alert_governance.md) |
+
+### Core Acceptance & Operational Documentation
+- 📋 **Final Readiness Report**: [`docs/acceptance/final_readiness_report.md`](file:///home/arun-roshan-gj/SIH/docs/acceptance/final_readiness_report.md)
+- 📊 **Formal Acceptance Matrix**: [`docs/acceptance/acceptance_matrix.md`](file:///home/arun-roshan-gj/SIH/docs/acceptance/acceptance_matrix.md)
+- 🔬 **Scientific Validation Report**: [`docs/validation/scientific_validation.md`](file:///home/arun-roshan-gj/SIH/docs/validation/scientific_validation.md)
+- 📉 **Baseline Comparisons**: [`docs/validation/baseline_comparison.md`](file:///home/arun-roshan-gj/SIH/docs/validation/baseline_comparison.md)
+- 🌪️ **Storm Event Case Studies**: [`docs/validation/storm_event_case_studies.md`](file:///home/arun-roshan-gj/SIH/docs/validation/storm_event_case_studies.md)
+- ⚡ **Lightning Jump Validation**: [`docs/validation/lightning_validation.md`](file:///home/arun-roshan-gj/SIH/docs/validation/lightning_validation.md)
+- 🎯 **Storm Location Verification**: [`docs/validation/storm_location_verification.md`](file:///home/arun-roshan-gj/SIH/docs/validation/storm_location_verification.md)
+- 🎲 **Uncertainty & Calibration**: [`docs/validation/uncertainty_and_calibration.md`](file:///home/arun-roshan-gj/SIH/docs/validation/uncertainty_and_calibration.md)
+- 🛠️ **Operational SOPs (18 Procedures)**: [`docs/operations/sops.md`](file:///home/arun-roshan-gj/SIH/docs/operations/sops.md)
+- 🧑‍✈️ **Human Oversight Protocol**: [`docs/operations/human_oversight.md`](file:///home/arun-roshan-gj/SIH/docs/operations/human_oversight.md)
+- 💥 **Chaos & Failure Drills**: [`docs/operations/incident_drills.md`](file:///home/arun-roshan-gj/SIH/docs/operations/incident_drills.md)
+- 📜 **Model Governance Policy**: [`docs/governance/model_governance.md`](file:///home/arun-roshan-gj/SIH/docs/governance/model_governance.md)
+- 🚨 **Alert Governance & CAP v1.2**: [`docs/governance/alert_governance.md`](file:///home/arun-roshan-gj/SIH/docs/governance/alert_governance.md)
+- 🗄️ **Data Governance & Provenance**: [`docs/governance/data_governance.md`](file:///home/arun-roshan-gj/SIH/docs/governance/data_governance.md)
+- ⚠️ **Scientific & Physical Limitations**: [`docs/scientific_limitations.md`](file:///home/arun-roshan-gj/SIH/docs/scientific_limitations.md)
+- 📖 **Forecaster & Operator Guide**: [`docs/training/operator_guide.md`](file:///home/arun-roshan-gj/SIH/docs/training/operator_guide.md)
+
+---
+
 ## 💻 Quick Start Guide
 
 ### 1. Installation & Environment Setup

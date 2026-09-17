@@ -1,0 +1,83 @@
+{
+  "domain": "Software Readiness",
+  "evaluated_at": "2026-09-17T13:10:19.452609+00:00",
+  "software_version": "v2.1.0",
+  "status": "PASS",
+  "probes": {
+    "/health": {
+      "status_code": 200,
+      "body": {
+        "status": "HEALTHY",
+        "timestamp": "2026-09-17T13:09:53.953515+00:00"
+      }
+    },
+    "/live": {
+      "status_code": 200,
+      "body": {
+        "status": "ALIVE",
+        "timestamp": "2026-09-17T13:09:53.955800+00:00"
+      }
+    },
+    "/ready": {
+      "status_code": 200,
+      "body": {
+        "overall_status": "DEGRADED",
+        "timestamp": "2026-09-17T13:10:06.282295+00:00",
+        "components": {
+          "database": {
+            "state": "HEALTHY",
+            "status": "CONNECTED",
+            "engine": "SQLite WAL"
+          },
+          "storage": {
+            "state": "HEALTHY",
+            "data_dir": "READ_WRITE",
+            "models_dir": "READABLE"
+          },
+          "model": {
+            "state": "HEALTHY",
+            "status": "READY",
+            "model_id": "convlstm_real_best",
+            "version": "1.0.0",
+            "architecture": "2.0.0"
+          },
+          "providers": {
+            "state": "DEGRADED",
+            "healthy_count": 2,
+            "unhealthy_count": 3,
+            "degraded_providers": [
+              "open_meteo_weather",
+              "rainviewer_radar",
+              "imd_mausam_dwr"
+            ]
+          }
+        }
+      }
+    },
+    "/api/system/health": {
+      "status_code": 200,
+      "status": null
+    },
+    "/api/radar-grid": {
+      "status_code": 200,
+      "has_grid": true
+    }
+  },
+  "container_security": {
+    "backend_non_root_user": true,
+    "backend_healthcheck": true,
+    "frontend_built": true
+  },
+  "regression_test_summary": {
+    "phases_covered": [
+      "Phase 9 Ingestion",
+      "Phase 10 Monitoring",
+      "Phase 11 Reliability",
+      "Phase 12 Deployment"
+    ],
+    "total_tests_passed": 64,
+    "total_tests_failed": 0,
+    "coverage_duration_seconds": 50.86
+  },
+  "duration_ms": 25508.18
+}
